@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>버섯사업 4개년 손익계획</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 좁은 단일 컬럼 작업지 — 요약(결과·그래프) 먼저, 입력 표는 아래 섹션별 */
+:root {
+  --bg: #f3f4f1;
+  --surface: #ffffff;
+  --fg: #1d2420;
+  --muted: #5e6862;
+  --line: #d9ddd7;
+  --accent: #3d6b4f;      /* 이끼색: 배지 */
+  --c-mush: #b4772d;      /* 버섯 */
+  --c-mod: #4c6a8c;       /* 모듈러 */
+  --c-profit: #1d2420;    /* 영업이익 선 */
+  --input-bg: #f8f9f6;
+  --warn: #b3412e;
+  --warn-bg: #fbeae6;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
+    --accent: #7fb08f; --c-mush: #d9a35d; --c-mod: #8eaccc; --c-profit: #e6ebe7;
+    --input-bg: #232b26; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
+  --accent: #7fb08f; --c-mush: #d9a35d; --c-mod: #8eaccc; --c-profit: #e6ebe7;
+  --input-bg: #232b26; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.55; margin: 0; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 28px; }
+header { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; justify-content: space-between; }
+h1 { font-size: 24px; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.ctl { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.ctl input, .ctl select { width: 110px; }
+section { display: grid; gap: 12px; min-width: 0; }
+h2 { font-size: 16px; margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h2 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; min-width: 0; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+td.num, td .num { font-family: var(--font-num); }
+tr.group td { padding-top: 14px; font-weight: 700; border-bottom: none; }
+tr.total td { font-weight: 700; border-top: 2px solid var(--fg); }
+tr.calc td { color: var(--muted); }
+tr.profit td { font-weight: 700; color: var(--accent); }
+.unit { color: var(--muted); font-size: 12px; margin-left: 4px; }
+input, select { font: inherit; font-family: var(--font-num); color: var(--fg); background: var(--input-bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
+td input { width: 130px; text-align: right; }
+td input.txt { width: 150px; text-align: left; font-family: var(--font-body); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: inherit; font-size: 13px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 500; }
+button.primary:hover { color: var(--surface); filter: brightness(1.08); }
+button:disabled { opacity: 0.6; cursor: default; }
+.toast { font-size: 12px; color: var(--muted); min-height: 1em; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.kpi .k { font-size: 12px; color: var(--muted); letter-spacing: 0.02em; }
+.kpi .v { font-family: var(--font-num); font-size: 20px; font-weight: 500; }
+.chart-box { position: relative; height: 340px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.warn { color: var(--warn); }
+.badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); margin-left: 6px; font-family: var(--font-body); }
+.note { color: var(--muted); font-size: 12px; margin: 0; }
+.example { font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 4px; padding: 6px 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>버섯사업 4개년 손익계획</h1>
+      <p class="sub">배지·버섯·모듈러 매출, 배지 재고, 생산능력, 투자비를 한 화면에서 계산합니다.</p>
+    </div>
+    <div class="controls">
+      <label class="ctl">시작 연도<input id="startYear" type="number" step="1"></label>
+      <label class="ctl">영업이익률 (%)<input id="margin" type="number" step="0.1"></label>
+      <label class="ctl">표시 단위
+        <select id="unitSel">
+          <option value="1">원</option>
+          <option value="1000">천원</option>
+          <option value="1000000">백만원</option>
+          <option value="100000000">억원</option>
+        </select>
+      </label>
+      <button id="xlsxBtn" type="button" class="primary">엑셀로 내보내기</button>
+      <button id="resetBtn" type="button">예시값으로 초기화</button>
+    </div>
+  </header>
+
+  <p class="toast" id="toast" role="status"></p>
+  <p class="example" id="exampleNote">처음 열면 예시값이 채워져 있습니다. 실제 단가와 수량으로 바꿔 입력하세요. 입력값은 이 브라우저에 자동 저장됩니다.</p>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section>
+    <h2>예상 매출 · 영업이익 <small id="unitLabel"></small></h2>
+    <div class="panel tbl-wrap"><table id="resultTbl"></table></div>
+  </section>
+
+  <section>
+    <h2>매출 · 영업이익 추이</h2>
+    <div class="panel"><div class="chart-box"><canvas id="chart" aria-label="연도별 매출과 영업이익 그래프"></canvas></div></div>
+  </section>
+
+  <section>
+    <h2>매출 입력 <small>연도별 단가(원)와 판매 수량</small></h2>
+    <div class="panel tbl-wrap"><table id="salesTbl"></table></div>
+  </section>
+
+  <section>
+    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 판매량</small></h2>
+    <div class="panel tbl-wrap"><table id="mediumTbl"></table></div>
+  </section>
+
+  <section>
+    <h2>버섯 생산시설 <small>연도별 가동 대수 → 연간 버섯 생산능력</small></h2>
+    <div class="panel tbl-wrap"><table id="facTbl"></table></div>
+    <div class="row">
+      <button id="fillMush" type="button">버섯 판매량을 생산능력으로 채우기</button>
+      <p class="note">버섯 판매량이 생산능력보다 많으면 매출 입력 표에 경고가 표시됩니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>투자 계획 <small>연도별 부지·건축 면적(평) × 평당 단가 · 투자 내용은 자유 입력</small></h2>
+    <div class="panel tbl-wrap"><table id="investTbl"></table></div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const MODELS = [
+  { key: "m30",   name: "m30-54",    cap: 54000 },
+  { key: "m15",   name: "m15-27",    cap: 27000 },
+  { key: "m3000", name: "m3000-100", cap: 1000000 },
+  { key: "m6000", name: "m6000-200", cap: 2000000 },
+  { key: "mod",   name: "모듈러",     cap: 18000 },
+];
+const PYEONG_M2 = 3.305785;
+const STORE_KEY = "mushroom-forecast-v1";
+
+// 예시값 — 실제 수치가 아님
+function defaults() {
+  return {
+    startYear: 2027, margin: 50, unit: 1000000,
+    medium:   { price: [1200, 1200, 1250, 1300], prod: [500000, 900000, 1400000, 2000000], sales: [400000, 800000, 1300000, 1900000], opening: 0 },
+    mushroom: { price: [1500, 1500, 1550, 1600], sales: [1000000, 1099000, 8000000, 11000000] },
+    modular:  { price: [40000000, 40000000, 41000000, 42000000], sales: [2, 5, 8, 12] },
+    fac: { m30: [1, 1, 1, 1], m15: [1, 1, 1, 1], m3000: [1, 1, 1, 1], m6000: [0, 0, 5, 5], mod: [1, 1, 2, 2] },
+    invest: {
+      label:     ["1차: 100만개 시설", "", "2차: 1,000만개 시설", ""],
+      landArea:  [1500, 0, 6000, 0],
+      landPrice: [300000, 0, 320000, 0],
+      bldgArea:  [600, 0, 2500, 0],
+      bldgPrice: [4500000, 0, 4700000, 0],
+    },
+  };
+}
+let S;
+try { S = JSON.parse(localStorage.getItem(STORE_KEY)) || defaults(); } catch (e) { S = defaults(); }
+// 이전 버전(투자비 1회 입력) 저장값은 연도별 형식으로 교체
+if (!S.invest || !Array.isArray(S.invest.landArea)) S.invest = defaults().invest;
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
+
+const $ = id => document.getElementById(id);
+const n = v => (isFinite(+v) ? +v : 0);
+const fmtInt = v => Math.round(v).toLocaleString("ko-KR");
+const unitName = () => ({ 1: "원", 1000: "천원", 1000000: "백만원", 100000000: "억원" })[S.unit];
+const money = v => {
+  const x = v / S.unit;
+  return x.toLocaleString("ko-KR", { maximumFractionDigits: S.unit >= 1000000 ? 1 : 0 });
+};
+const years = () => [0, 1, 2, 3].map(i => n(S.startYear) + i);
+const get = path => path.split(".").reduce((o, k) => o[k], S);
+function set(path, v) {
+  const ks = path.split("."); const last = ks.pop();
+  ks.reduce((o, k) => o[k], S)[last] = v;
+}
+const inp = (path, step = "1") => `<input type="number" min="0" step="${step}" id="i-${path.replace(/\./g, "-")}" data-path="${path}" value="${get(path)}">`;
+const esc = v => String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const txt = path => `<input type="text" class="txt" id="i-${path.replace(/\./g, "-")}" data-path="${path}" data-text="1" value="${esc(get(path))}" placeholder="예: 1차 투자">`;
+
+function calc() {
+  const r = { medium: [], mushroom: [], modular: [], total: [], profit: [], cap: [], inv: [] };
+  let stock = n(S.medium.opening);
+  for (let i = 0; i < 4; i++) {
+    r.medium[i] = n(S.medium.price[i]) * n(S.medium.sales[i]);
+    r.mushroom[i] = n(S.mushroom.price[i]) * n(S.mushroom.sales[i]);
+    r.modular[i] = n(S.modular.price[i]) * n(S.modular.sales[i]);
+    r.total[i] = r.medium[i] + r.mushroom[i] + r.modular[i];
+    r.profit[i] = r.total[i] * n(S.margin) / 100;
+    r.cap[i] = MODELS.reduce((s, m) => s + n(S.fac[m.key][i]) * m.cap, 0);
+    const open = stock;
+    stock = open + n(S.medium.prod[i]) - n(S.medium.sales[i]);
+    r.inv[i] = { open, close: stock };
+  }
+  const sum = a => a.reduce((x, y) => x + y, 0);
+  r.sum = { medium: sum(r.medium), mushroom: sum(r.mushroom), modular: sum(r.modular), total: sum(r.total), profit: sum(r.profit) };
+  const I = S.invest;
+  r.land = [0, 1, 2, 3].map(i => n(I.landArea[i]) * n(I.landPrice[i]));
+  r.bldg = [0, 1, 2, 3].map(i => n(I.bldgArea[i]) * n(I.bldgPrice[i]));
+  r.inv_y = [0, 1, 2, 3].map(i => r.land[i] + r.bldg[i]);
+  r.inv_cum = r.inv_y.map((v, i) => r.inv_y.slice(0, i + 1).reduce((a, b) => a + b, 0));
+  r.landArea = sum(I.landArea.map(n));
+  r.bldgArea = sum(I.bldgArea.map(n));
+  r.investTotal = sum(r.inv_y);
+  return r;
+}
+
+const yearHead = (first, extra = "") => `<thead><tr><th>${first}</th>${years().map(y => `<th>${y}년</th>`).join("")}${extra}</tr></thead>`;
+
+// 입력 표는 한 번만 그리고, 계산 셀만 갱신해서 입력 포커스를 유지한다
+function buildInputs() {
+  const row = (label, unit, path, step) =>
+    `<tr><td>${label}<span class="unit">${unit}</span></td>${[0,1,2,3].map(i => `<td>${inp(`${path}.${i}`, step)}</td>`).join("")}</tr>`;
+  const calcRow = (label, id) =>
+    `<tr class="calc"><td>${label}<span class="unit">${unitName()}</span></td>${[0,1,2,3].map(i => `<td class="num" id="${id}-${i}"></td>`).join("")}</tr>`;
+
+  $("salesTbl").innerHTML = yearHead("항목") + "<tbody>" +
+    `<tr class="group"><td><span class="dot" style="background:var(--accent)"></span>배지</td><td colspan="4"></td></tr>` +
+    row("단가", "원/개", "medium.price") + row("판매량", "개", "medium.sales") + calcRow("매출", "c-med") +
+    `<tr class="group"><td><span class="dot" style="background:var(--c-mush)"></span>버섯</td><td colspan="4"></td></tr>` +
+    row("단가", "원/개", "mushroom.price") + row("판매량", "개", "mushroom.sales") +
+    `<tr class="calc"><td>생산능력<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-cap2-${i}"></td>`).join("")}</tr>` +
+    calcRow("매출", "c-mush") +
+    `<tr class="group"><td><span class="dot" style="background:var(--c-mod)"></span>모듈러</td><td colspan="4"></td></tr>` +
+    row("단가", "원/대", "modular.price") + row("판매량", "대", "modular.sales") + calcRow("매출", "c-mod") +
+    "</tbody>";
+
+  $("mediumTbl").innerHTML = yearHead("항목") + "<tbody>" +
+    `<tr><td>기초재고<span class="unit">개</span></td><td>${inp("medium.opening")}</td>${[1,2,3].map(i => `<td class="num" id="c-open-${i}"></td>`).join("")}</tr>` +
+    row("생산량", "개", "medium.prod") +
+    `<tr class="calc"><td>판매량<span class="unit">개 · 매출 입력 표에서</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-msales-${i}"></td>`).join("")}</tr>` +
+    `<tr class="total"><td>기말재고<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-close-${i}"></td>`).join("")}</tr>` +
+    "</tbody>";
+
+  $("facTbl").innerHTML = yearHead("모델", "") + "<tbody>" +
+    MODELS.map(m => `<tr><td>${m.name}<span class="unit">대 · 연 ${fmtInt(m.cap)}개/대</span></td>${[0,1,2,3].map(i => `<td>${inp(`fac.${m.key}.${i}`)}</td>`).join("")}</tr>`).join("") +
+    `<tr class="total"><td>연간 버섯 생산능력<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-cap-${i}"></td>`).join("")}</tr>` +
+    "</tbody>";
+
+  const ir = (label, unit, cells, cls = "") => `<tr class="${cls}"><td>${label}<span class="unit">${unit}</span></td>${cells}</tr>`;
+  const ic = id => [0,1,2,3].map(i => `<td class="num" id="${id}-${i}"></td>`).join("") + `<td class="num" id="${id}-t"></td>`;
+  const ii = (path, step) => [0,1,2,3].map(i => `<td>${inp(`${path}.${i}`, step)}</td>`).join("") + "<td></td>";
+  $("investTbl").innerHTML = yearHead("항목", "<th>합계</th>") + "<tbody>" +
+    ir("투자 내용", "", [0,1,2,3].map(i => `<td>${txt(`invest.label.${i}`)}</td>`).join("") + "<td></td>") +
+    `<tr class="group"><td>부지</td><td colspan="5"></td></tr>` +
+    ir("면적", "평", ii("invest.landArea", "0.1")) +
+    ir("면적 환산", "㎡", ic("c-landm2"), "calc") +
+    ir("평당 단가", "원", ii("invest.landPrice")) +
+    ir("부지 비용", unitName(), ic("c-land"), "calc") +
+    `<tr class="group"><td>건축</td><td colspan="5"></td></tr>` +
+    ir("면적", "평", ii("invest.bldgArea", "0.1")) +
+    ir("면적 환산", "㎡", ic("c-bldgm2"), "calc") +
+    ir("평당 단가", "원", ii("invest.bldgPrice")) +
+    ir("건축 비용", unitName(), ic("c-bldg"), "calc") +
+    ir("연간 투자비", unitName(), ic("c-invy"), "total") +
+    ir("누적 투자비", unitName(), [0,1,2,3].map(i => `<td class="num" id="c-invcum-${i}"></td>`).join("") + "<td></td>", "calc") +
+    "</tbody>";
+
+  $("startYear").value = S.startYear;
+  $("margin").value = S.margin;
+  $("unitSel").value = String(S.unit);
+}
+
+function update() {
+  const r = calc();
+  const t = (id, v) => { const el = $(id); if (el) el.innerHTML = v; };
+  for (let i = 0; i < 4; i++) {
+    t(`c-med-${i}`, money(r.medium[i]));
+    t(`c-mush-${i}`, money(r.mushroom[i]));
+    t(`c-mod-${i}`, money(r.modular[i]));
+    t(`c-cap-${i}`, fmtInt(r.cap[i]));
+    const over = n(S.mushroom.sales[i]) > r.cap[i];
+    t(`c-cap2-${i}`, fmtInt(r.cap[i]) + (over ? `<span class="badge">판매량 초과</span>` : ""));
+    t(`c-msales-${i}`, fmtInt(n(S.medium.sales[i])));
+    if (i > 0) t(`c-open-${i}`, fmtInt(r.inv[i].open));
+    const neg = r.inv[i].close < 0;
+    t(`c-close-${i}`, `<span class="${neg ? "warn" : ""}">${fmtInt(r.inv[i].close)}</span>` + (neg ? `<span class="badge">재고 부족</span>` : ""));
+  }
+  for (let i = 0; i < 4; i++) {
+    t(`c-landm2-${i}`, fmtInt(n(S.invest.landArea[i]) * PYEONG_M2));
+    t(`c-bldgm2-${i}`, fmtInt(n(S.invest.bldgArea[i]) * PYEONG_M2));
+    t(`c-land-${i}`, money(r.land[i]));
+    t(`c-bldg-${i}`, money(r.bldg[i]));
+    t(`c-invy-${i}`, money(r.inv_y[i]));
+    t(`c-invcum-${i}`, money(r.inv_cum[i]));
+  }
+  t("c-landm2-t", fmtInt(r.landArea * PYEONG_M2));
+  t("c-bldgm2-t", fmtInt(r.bldgArea * PYEONG_M2));
+  t("c-land-t", money(r.land.reduce((a, b) => a + b, 0)));
+  t("c-bldg-t", money(r.bldg.reduce((a, b) => a + b, 0)));
+  t("c-invy-t", money(r.investTotal));
+
+  // 결과표
+  const line = (label, arr, total, cls = "", dot = "") =>
+    `<tr class="${cls}"><td>${dot ? `<span class="dot" style="background:${dot}"></span>` : ""}${label}</td>${arr.map(v => `<td class="num">${money(v)}</td>`).join("")}<td class="num">${money(total)}</td></tr>`;
+  $("resultTbl").innerHTML = yearHead("구분", "<th>4년 합계</th>") + "<tbody>" +
+    line("배지 매출", r.medium, r.sum.medium, "", "var(--accent)") +
+    line("버섯 매출", r.mushroom, r.sum.mushroom, "", "var(--c-mush)") +
+    line("모듈러 매출", r.modular, r.sum.modular, "", "var(--c-mod)") +
+    line("매출 합계", r.total, r.sum.total, "total") +
+    line(`영업이익 (${n(S.margin)}%)`, r.profit, r.sum.profit, "profit") +
+    line("투자비", r.inv_y, r.investTotal, "calc") +
+    `<tr class="calc"><td>배지 기말재고 (개)</td>${r.inv.map(x => `<td class="num">${fmtInt(x.close)}</td>`).join("")}<td></td></tr>` +
+    "</tbody>";
+  $("unitLabel").textContent = `단위: ${unitName()}`;
+
+  // KPI
+  const y = years();
+  $("kpis").innerHTML = [
+    ["4년 누적 매출", money(r.sum.total) + `<span class="unit">${unitName()}</span>`],
+    ["4년 누적 영업이익", money(r.sum.profit) + `<span class="unit">${unitName()}</span>`],
+    [`${y[3]}년 매출`, money(r.total[3]) + `<span class="unit">${unitName()}</span>`],
+    ["총 투자비용", money(r.investTotal) + `<span class="unit">${unitName()}</span>`],
+  ].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+
+  drawChart(r);
+  save();
+}
+
+let chart;
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function drawChart(r) {
+  if (typeof Chart === "undefined") return;
+  const d = arr => arr.map(v => +(v / S.unit).toFixed(2));
+  const labels = years().map(y => `${y}년`);
+  const ds = [
+    { type: "bar", label: "배지 매출", data: d(r.medium), backgroundColor: css("--accent"), stack: "s", order: 2 },
+    { type: "bar", label: "버섯 매출", data: d(r.mushroom), backgroundColor: css("--c-mush"), stack: "s", order: 2 },
+    { type: "bar", label: "모듈러 매출", data: d(r.modular), backgroundColor: css("--c-mod"), stack: "s", order: 2 },
+    { type: "line", label: "영업이익", data: d(r.profit), borderColor: css("--c-profit"), backgroundColor: css("--c-profit"),
+      borderWidth: 2, pointRadius: 4, tension: 0.2, order: 1 },
+  ];
+  const fg = css("--muted"), grid = css("--line");
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets.forEach((x, i) => { x.data = ds[i].data; x.backgroundColor = ds[i].backgroundColor; x.borderColor = ds[i].borderColor; });
+    chart.options.scales.y.title.text = unitName();
+    chart.options.scales.x.ticks.color = chart.options.scales.y.ticks.color = chart.options.plugins.legend.labels.color = fg;
+    chart.options.scales.y.grid.color = grid;
+    chart.update("none");
+    return;
+  }
+  chart = new Chart($("chart"), {
+    data: { labels, datasets: ds },
+    options: {
+      maintainAspectRatio: false, animation: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "bottom", labels: { color: fg, boxWidth: 12, font: { family: "IBM Plex Sans KR" } } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toLocaleString("ko-KR")} ${unitName()}` } },
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: fg } },
+        y: { stacked: true, beginAtZero: true, grid: { color: grid }, ticks: { color: fg, callback: v => v.toLocaleString("ko-KR") },
+             title: { display: true, text: unitName(), color: fg } },
+      },
+    },
+  });
+}
+
+document.addEventListener("input", e => {
+  const p = e.target.dataset && e.target.dataset.path;
+  if (p && e.target.dataset.text) { set(p, e.target.value); save(); return; }
+  if (p) { set(p, e.target.value === "" ? 0 : +e.target.value); update(); }
+});
+$("startYear").addEventListener("input", e => { S.startYear = +e.target.value || 2027; rebuild(); });
+$("margin").addEventListener("input", e => { S.margin = +e.target.value; update(); });
+$("unitSel").addEventListener("change", e => { S.unit = +e.target.value; rebuild(); });
+$("fillMush").addEventListener("click", () => {
+  const r = calc();
+  S.mushroom.sales = r.cap.slice();
+  rebuild();
+});
+let confirmReset = false;
+$("resetBtn").addEventListener("click", e => {
+  if (!confirmReset) { confirmReset = true; e.target.textContent = "한 번 더 누르면 초기화"; setTimeout(() => { confirmReset = false; e.target.textContent = "예시값으로 초기화"; }, 3000); return; }
+  confirmReset = false; e.target.textContent = "예시값으로 초기화";
+  S = defaults(); rebuild();
+});
+function rebuild() { buildInputs(); update(); }
+
+// ---- 엑셀 내보내기 (금액은 원 단위 숫자) ----
+function buildWorkbook() {
+  const r = calc();
+  const y = years().map(v => `${v}년`);
+  const sheet = (rows, widths) => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = widths.map(w => ({ wch: w }));
+    for (const ref in ws) {
+      if (ref[0] === "!") continue;
+      if (typeof ws[ref].v === "number") ws[ref].z = Number.isInteger(ws[ref].v) ? "#,##0" : "#,##0.0";
+    }
+    return ws;
+  };
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, sheet([
+    ["버섯사업 4개년 손익계획", "", "", "", "", ""],
+    ["단위: 원", `영업이익률 ${n(S.margin)}%`],
+    [],
+    ["구분", ...y, "4년 합계"],
+    ["배지 매출", ...r.medium, r.sum.medium],
+    ["버섯 매출", ...r.mushroom, r.sum.mushroom],
+    ["모듈러 매출", ...r.modular, r.sum.modular],
+    ["매출 합계", ...r.total, r.sum.total],
+    [`영업이익 (${n(S.margin)}%)`, ...r.profit, r.sum.profit],
+    [],
+    ["배지 기말재고 (개)", ...r.inv.map(x => x.close)],
+    ["버섯 생산능력 (개)", ...r.cap],
+    [],
+    ["투자비", ...r.inv_y, r.investTotal],
+  ], [22, 16, 16, 16, 16, 18]), "손익요약");
+
+  XLSX.utils.book_append_sheet(wb, sheet([
+    ["구분", "항목", "단위", ...y],
+    ["배지", "단가", "원/개", ...S.medium.price.map(n)],
+    ["배지", "판매량", "개", ...S.medium.sales.map(n)],
+    ["배지", "매출", "원", ...r.medium],
+    ["버섯", "단가", "원/개", ...S.mushroom.price.map(n)],
+    ["버섯", "판매량", "개", ...S.mushroom.sales.map(n)],
+    ["버섯", "매출", "원", ...r.mushroom],
+    ["모듈러", "단가", "원/대", ...S.modular.price.map(n)],
+    ["모듈러", "판매량", "대", ...S.modular.sales.map(n)],
+    ["모듈러", "매출", "원", ...r.modular],
+  ], [10, 10, 8, 16, 16, 16, 16]), "매출입력");
+
+  XLSX.utils.book_append_sheet(wb, sheet([
+    ["항목 (개)", ...y],
+    ["기초재고", ...r.inv.map(x => x.open)],
+    ["생산량", ...S.medium.prod.map(n)],
+    ["판매량", ...S.medium.sales.map(n)],
+    ["기말재고", ...r.inv.map(x => x.close)],
+  ], [14, 14, 14, 14, 14]), "배지재고");
+
+  XLSX.utils.book_append_sheet(wb, sheet([
+    ["모델", "대당 연간 생산 (개)", ...y.map(v => `${v} 대수`), ...y.map(v => `${v} 생산능력`)],
+    ...MODELS.map(m => [m.name, m.cap, ...S.fac[m.key].map(n), ...S.fac[m.key].map(v => n(v) * m.cap)]),
+    ["합계", "", "", "", "", "", ...r.cap],
+  ], [12, 18, 11, 11, 11, 11, 16, 16, 16, 16]), "생산시설");
+
+  const I = S.invest;
+  XLSX.utils.book_append_sheet(wb, sheet([
+    ["항목", "단위", ...y, "합계"],
+    ["투자 내용", "", ...I.label.map(String), ""],
+    ["부지 면적", "평", ...I.landArea.map(n), r.landArea],
+    ["부지 면적", "㎡", ...I.landArea.map(v => +(n(v) * PYEONG_M2).toFixed(1)), +(r.landArea * PYEONG_M2).toFixed(1)],
+    ["부지 평당 단가", "원", ...I.landPrice.map(n), ""],
+    ["부지 비용", "원", ...r.land, r.land.reduce((a, b) => a + b, 0)],
+    ["건축 면적", "평", ...I.bldgArea.map(n), r.bldgArea],
+    ["건축 면적", "㎡", ...I.bldgArea.map(v => +(n(v) * PYEONG_M2).toFixed(1)), +(r.bldgArea * PYEONG_M2).toFixed(1)],
+    ["건축 평당 단가", "원", ...I.bldgPrice.map(n), ""],
+    ["건축 비용", "원", ...r.bldg, r.bldg.reduce((a, b) => a + b, 0)],
+    ["연간 투자비", "원", ...r.inv_y, r.investTotal],
+    ["누적 투자비", "원", ...r.inv_cum, ""],
+  ], [16, 6, 18, 18, 18, 18, 18]), "투자비");
+
+  return wb;
+}
+
+let downloadsApi; // undefined = 아직 모름, null = 사용 불가
+if (window.claude && claude.use) claude.use("downloads").then(d => { downloadsApi = d; });
+const toast = msg => { $("toast").textContent = msg; };
+
+$("xlsxBtn").addEventListener("click", async e => {
+  if (typeof XLSX === "undefined") { toast("엑셀 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도하세요."); return; }
+  const filename = `버섯사업_손익계획_${years()[0]}-${years()[3]}.xlsx`;
+  const wb = buildWorkbook();
+  if (downloadsApi) {
+    e.target.disabled = true;
+    try {
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      await downloadsApi.save({ filename, data: new Blob([buf]) });
+      toast(`${filename} 저장을 시작했습니다.`);
+    } catch (err) {
+      const code = err && err.code;
+      toast(code === "declined" ? "저장을 취소했습니다."
+          : code === "rate_limited" ? "저장 확인 창이 이미 열려 있습니다. 잠시 후 다시 눌러 주세요."
+          : "이 화면에서는 파일 저장을 할 수 없습니다.");
+    } finally { e.target.disabled = false; }
+  } else if (window.claude && claude.use && downloadsApi === undefined) {
+    toast("저장 기능을 준비 중입니다. 잠시 후 다시 눌러 주세요.");
+  } else {
+    XLSX.writeFile(wb, filename); // 로컬에서 직접 열었을 때
+    toast(`${filename} 파일을 내려받았습니다.`);
+  }
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => update());
+rebuild();
+</script>
+
+</body>
+</html>
