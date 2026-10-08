@@ -90,7 +90,7 @@ button:disabled { opacity: 0.6; cursor: default; }
   <header>
     <div>
       <h1>버섯사업 4개년 손익계획</h1>
-      <p class="sub">배지·버섯·모듈러 매출, 배지 재고, 생산능력, 투자비를 한 화면에서 계산합니다.</p>
+      <p class="sub">배지·버섯·모듈러 매출, 배지 재고·소비량, 버섯 생산량, 투자비를 한 화면에서 계산합니다.</p>
     </div>
     <div class="controls">
       <label class="ctl">시작 연도<input id="startYear" type="number" step="1"></label>
@@ -129,16 +129,17 @@ button:disabled { opacity: 0.6; cursor: default; }
   </section>
 
   <section>
-    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 판매량</small></h2>
+    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 판매량 − 시설 소비량</small></h2>
+    <label class="row note"><input type="checkbox" id="deduct"> 버섯 생산시설의 배지 소비량을 재고에서 차감</label>
     <div class="panel tbl-wrap"><table id="mediumTbl"></table></div>
   </section>
 
   <section>
-    <h2>버섯 생산시설 <small>연도별 가동 대수 → 연간 버섯 생산능력</small></h2>
+    <h2>버섯 생산시설 <small>가동 대수 → 배지 소비량 → 버섯 생산량 (배지 소비량 × 배지당 생산량 g)</small></h2>
     <div class="panel tbl-wrap"><table id="facTbl"></table></div>
     <div class="row">
-      <button id="fillMush" type="button">버섯 판매량을 생산능력으로 채우기</button>
-      <p class="note">버섯 판매량이 생산능력보다 많으면 매출 입력 표에 경고가 표시됩니다.</p>
+      <button id="fillMush" type="button">버섯 판매량을 생산량(kg)으로 채우기</button>
+      <p class="note">버섯 판매량이 생산량보다 많으면 매출 입력 표에 경고가 표시됩니다.</p>
     </div>
   </section>
 
@@ -160,15 +161,18 @@ const MODELS = [
 ];
 const PYEONG_M2 = 3.305785;
 const STORE_KEY = "mushroom-forecast-v1";
+const DATA_VER = 2; // 2: 모델 숫자 = 연간 배지 소비량, 버섯은 kg 단위
 
 // 예시값 — 실제 수치가 아님
 function defaults() {
   return {
     startYear: 2027, margin: 50, unit: 1000000,
-    medium:   { price: [1200, 1200, 1250, 1300], prod: [500000, 900000, 1400000, 2000000], sales: [400000, 800000, 1300000, 1900000], opening: 0 },
-    mushroom: { price: [1500, 1500, 1550, 1600], sales: [1000000, 1099000, 8000000, 11000000] },
+    ver: DATA_VER, deduct: true,
+    medium:   { price: [1200, 1200, 1250, 1300], prod: [1600000, 1700000, 11800000, 12000000], sales: [400000, 500000, 600000, 800000], opening: 0 },
+    mushroom: { price: [5000, 5000, 5200, 5400], sales: [329700, 329700, 3335100, 3335100] },
     modular:  { price: [40000000, 40000000, 41000000, 42000000], sales: [2, 5, 8, 12] },
     fac: { m30: [1, 1, 1, 1], m15: [1, 1, 1, 1], m3000: [1, 1, 1, 1], m6000: [0, 0, 5, 5], mod: [1, 1, 2, 2] },
+    gram: { m30: 300, m15: 300, m3000: 300, m6000: 300, mod: 300 },
     invest: {
       label:     ["1차: 100만개 시설", "", "2차: 1,000만개 시설", ""],
       landArea:  [1500, 0, 6000, 0],
@@ -182,11 +186,15 @@ let S;
 try { S = JSON.parse(localStorage.getItem(STORE_KEY)) || defaults(); } catch (e) { S = defaults(); }
 // 이전 버전(투자비 1회 입력) 저장값은 연도별 형식으로 교체
 if (!S.invest || !Array.isArray(S.invest.landArea)) S.invest = defaults().invest;
+// 이전 버전 저장값: 버섯이 '개' 단위였으므로 kg 기준 예시값으로 교체
+if (S.ver !== DATA_VER) { const d = defaults(); Object.assign(S, { ver: d.ver, deduct: d.deduct, gram: d.gram, mushroom: d.mushroom, medium: d.medium }); }
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
 
 const $ = id => document.getElementById(id);
 const n = v => (isFinite(+v) ? +v : 0);
 const fmtInt = v => Math.round(v).toLocaleString("ko-KR");
+const sumArr = a => a.reduce((x, y) => x + y, 0);
+const fmtTon = kg => (kg / 1000).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
 const unitName = () => ({ 1: "원", 1000: "천원", 1000000: "백만원", 100000000: "억원" })[S.unit];
 const money = v => {
   const x = v / S.unit;
@@ -203,7 +211,7 @@ const esc = v => String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 const txt = path => `<input type="text" class="txt" id="i-${path.replace(/\./g, "-")}" data-path="${path}" data-text="1" value="${esc(get(path))}" placeholder="예: 1차 투자">`;
 
 function calc() {
-  const r = { medium: [], mushroom: [], modular: [], total: [], profit: [], cap: [], inv: [] };
+  const r = { medium: [], mushroom: [], modular: [], total: [], profit: [], use: [], kg: [], inv: [] };
   let stock = n(S.medium.opening);
   for (let i = 0; i < 4; i++) {
     r.medium[i] = n(S.medium.price[i]) * n(S.medium.sales[i]);
@@ -211,9 +219,10 @@ function calc() {
     r.modular[i] = n(S.modular.price[i]) * n(S.modular.sales[i]);
     r.total[i] = r.medium[i] + r.mushroom[i] + r.modular[i];
     r.profit[i] = r.total[i] * n(S.margin) / 100;
-    r.cap[i] = MODELS.reduce((s, m) => s + n(S.fac[m.key][i]) * m.cap, 0);
+    r.use[i] = MODELS.reduce((s, m) => s + n(S.fac[m.key][i]) * m.cap, 0);
+    r.kg[i] = MODELS.reduce((s, m) => s + n(S.fac[m.key][i]) * m.cap * n(S.gram[m.key]) / 1000, 0);
     const open = stock;
-    stock = open + n(S.medium.prod[i]) - n(S.medium.sales[i]);
+    stock = open + n(S.medium.prod[i]) - n(S.medium.sales[i]) - (S.deduct ? r.use[i] : 0);
     r.inv[i] = { open, close: stock };
   }
   const sum = a => a.reduce((x, y) => x + y, 0);
@@ -242,8 +251,8 @@ function buildInputs() {
     `<tr class="group"><td><span class="dot" style="background:var(--accent)"></span>배지</td><td colspan="4"></td></tr>` +
     row("단가", "원/개", "medium.price") + row("판매량", "개", "medium.sales") + calcRow("매출", "c-med") +
     `<tr class="group"><td><span class="dot" style="background:var(--c-mush)"></span>버섯</td><td colspan="4"></td></tr>` +
-    row("단가", "원/개", "mushroom.price") + row("판매량", "개", "mushroom.sales") +
-    `<tr class="calc"><td>생산능력<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-cap2-${i}"></td>`).join("")}</tr>` +
+    row("단가", "원/kg", "mushroom.price") + row("판매량", "kg", "mushroom.sales", "0.1") +
+    `<tr class="calc"><td>생산량<span class="unit">kg · 생산시설 표에서</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-cap2-${i}"></td>`).join("")}</tr>` +
     calcRow("매출", "c-mush") +
     `<tr class="group"><td><span class="dot" style="background:var(--c-mod)"></span>모듈러</td><td colspan="4"></td></tr>` +
     row("단가", "원/대", "modular.price") + row("판매량", "대", "modular.sales") + calcRow("매출", "c-mod") +
@@ -253,12 +262,17 @@ function buildInputs() {
     `<tr><td>기초재고<span class="unit">개</span></td><td>${inp("medium.opening")}</td>${[1,2,3].map(i => `<td class="num" id="c-open-${i}"></td>`).join("")}</tr>` +
     row("생산량", "개", "medium.prod") +
     `<tr class="calc"><td>판매량<span class="unit">개 · 매출 입력 표에서</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-msales-${i}"></td>`).join("")}</tr>` +
+    `<tr class="calc"><td>시설 소비량<span class="unit">개 · 생산시설 표에서</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-muse-${i}"></td>`).join("")}</tr>` +
     `<tr class="total"><td>기말재고<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-close-${i}"></td>`).join("")}</tr>` +
     "</tbody>";
 
-  $("facTbl").innerHTML = yearHead("모델", "") + "<tbody>" +
-    MODELS.map(m => `<tr><td>${m.name}<span class="unit">대 · 연 ${fmtInt(m.cap)}개/대</span></td>${[0,1,2,3].map(i => `<td>${inp(`fac.${m.key}.${i}`)}</td>`).join("")}</tr>`).join("") +
-    `<tr class="total"><td>연간 버섯 생산능력<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-cap-${i}"></td>`).join("")}</tr>` +
+  const fcalc = (label, unit, id, cls = "calc") =>
+    `<tr class="${cls}"><td>${label}<span class="unit">${unit}</span></td><td></td>${[0,1,2,3].map(i => `<td class="num" id="${id}-${i}"></td>`).join("")}</tr>`;
+  $("facTbl").innerHTML = `<thead><tr><th>모델 (대수 입력)</th><th>배지당 생산량 (g)</th>${years().map(y => `<th>${y}년</th>`).join("")}</tr></thead><tbody>` +
+    MODELS.map(m => `<tr><td>${m.name}<span class="unit">대 · 배지 연 ${fmtInt(m.cap)}개/대</span></td><td>${inp(`gram.${m.key}`)}</td>${[0,1,2,3].map(i => `<td>${inp(`fac.${m.key}.${i}`)}</td>`).join("")}</tr>`).join("") +
+    fcalc("배지 소비량", "개", "c-use", "total") +
+    fcalc("버섯 생산량", "kg", "c-kg", "profit") +
+    fcalc("버섯 생산량", "톤", "c-ton") +
     "</tbody>";
 
   const ir = (label, unit, cells, cls = "") => `<tr class="${cls}"><td>${label}<span class="unit">${unit}</span></td>${cells}</tr>`;
@@ -282,6 +296,7 @@ function buildInputs() {
 
   $("startYear").value = S.startYear;
   $("margin").value = S.margin;
+  $("deduct").checked = !!S.deduct;
   $("unitSel").value = String(S.unit);
 }
 
@@ -292,9 +307,12 @@ function update() {
     t(`c-med-${i}`, money(r.medium[i]));
     t(`c-mush-${i}`, money(r.mushroom[i]));
     t(`c-mod-${i}`, money(r.modular[i]));
-    t(`c-cap-${i}`, fmtInt(r.cap[i]));
-    const over = n(S.mushroom.sales[i]) > r.cap[i];
-    t(`c-cap2-${i}`, fmtInt(r.cap[i]) + (over ? `<span class="badge">판매량 초과</span>` : ""));
+    t(`c-use-${i}`, fmtInt(r.use[i]));
+    t(`c-kg-${i}`, fmtInt(r.kg[i]));
+    t(`c-ton-${i}`, fmtTon(r.kg[i]));
+    t(`c-muse-${i}`, S.deduct ? fmtInt(r.use[i]) : `<span class="note">차감 안 함 (${fmtInt(r.use[i])})</span>`);
+    const over = n(S.mushroom.sales[i]) > r.kg[i] + 1e-9;
+    t(`c-cap2-${i}`, fmtInt(r.kg[i]) + (over ? `<span class="badge">판매량 초과</span>` : ""));
     t(`c-msales-${i}`, fmtInt(n(S.medium.sales[i])));
     if (i > 0) t(`c-open-${i}`, fmtInt(r.inv[i].open));
     const neg = r.inv[i].close < 0;
@@ -324,6 +342,8 @@ function update() {
     line("매출 합계", r.total, r.sum.total, "total") +
     line(`영업이익 (${n(S.margin)}%)`, r.profit, r.sum.profit, "profit") +
     line("투자비", r.inv_y, r.investTotal, "calc") +
+    `<tr class="calc"><td>배지 소비량 (개)</td>${r.use.map(v => `<td class="num">${fmtInt(v)}</td>`).join("")}<td class="num">${fmtInt(sumArr(r.use))}</td></tr>` +
+    `<tr class="calc"><td>버섯 생산량 (톤)</td>${r.kg.map(v => `<td class="num">${fmtTon(v)}</td>`).join("")}<td class="num">${fmtTon(sumArr(r.kg))}</td></tr>` +
     `<tr class="calc"><td>배지 기말재고 (개)</td>${r.inv.map(x => `<td class="num">${fmtInt(x.close)}</td>`).join("")}<td></td></tr>` +
     "</tbody>";
   $("unitLabel").textContent = `단위: ${unitName()}`;
@@ -389,10 +409,11 @@ document.addEventListener("input", e => {
 });
 $("startYear").addEventListener("input", e => { S.startYear = +e.target.value || 2027; rebuild(); });
 $("margin").addEventListener("input", e => { S.margin = +e.target.value; update(); });
+$("deduct").addEventListener("change", e => { S.deduct = e.target.checked; update(); });
 $("unitSel").addEventListener("change", e => { S.unit = +e.target.value; rebuild(); });
 $("fillMush").addEventListener("click", () => {
   const r = calc();
-  S.mushroom.sales = r.cap.slice();
+  S.mushroom.sales = r.kg.map(v => Math.round(v * 10) / 10);
   rebuild();
 });
 let confirmReset = false;
@@ -430,7 +451,9 @@ function buildWorkbook() {
     [`영업이익 (${n(S.margin)}%)`, ...r.profit, r.sum.profit],
     [],
     ["배지 기말재고 (개)", ...r.inv.map(x => x.close)],
-    ["버섯 생산능력 (개)", ...r.cap],
+    ["배지 소비량 (개)", ...r.use],
+    ["버섯 생산량 (kg)", ...r.kg],
+    ["버섯 생산량 (톤)", ...r.kg.map(v => v / 1000)],
     [],
     ["투자비", ...r.inv_y, r.investTotal],
   ], [22, 16, 16, 16, 16, 18]), "손익요약");
@@ -440,8 +463,8 @@ function buildWorkbook() {
     ["배지", "단가", "원/개", ...S.medium.price.map(n)],
     ["배지", "판매량", "개", ...S.medium.sales.map(n)],
     ["배지", "매출", "원", ...r.medium],
-    ["버섯", "단가", "원/개", ...S.mushroom.price.map(n)],
-    ["버섯", "판매량", "개", ...S.mushroom.sales.map(n)],
+    ["버섯", "단가", "원/kg", ...S.mushroom.price.map(n)],
+    ["버섯", "판매량", "kg", ...S.mushroom.sales.map(n)],
     ["버섯", "매출", "원", ...r.mushroom],
     ["모듈러", "단가", "원/대", ...S.modular.price.map(n)],
     ["모듈러", "판매량", "대", ...S.modular.sales.map(n)],
@@ -453,14 +476,16 @@ function buildWorkbook() {
     ["기초재고", ...r.inv.map(x => x.open)],
     ["생산량", ...S.medium.prod.map(n)],
     ["판매량", ...S.medium.sales.map(n)],
+    [S.deduct ? "시설 소비량" : "시설 소비량 (차감 안 함)", ...r.use],
     ["기말재고", ...r.inv.map(x => x.close)],
   ], [14, 14, 14, 14, 14]), "배지재고");
 
   XLSX.utils.book_append_sheet(wb, sheet([
-    ["모델", "대당 연간 생산 (개)", ...y.map(v => `${v} 대수`), ...y.map(v => `${v} 생산능력`)],
-    ...MODELS.map(m => [m.name, m.cap, ...S.fac[m.key].map(n), ...S.fac[m.key].map(v => n(v) * m.cap)]),
-    ["합계", "", "", "", "", "", ...r.cap],
-  ], [12, 18, 11, 11, 11, 11, 16, 16, 16, 16]), "생산시설");
+    ["모델", "대당 연간 배지 소비 (개)", "배지당 생산량 (g)", ...y.map(v => `${v} 대수`), ...y.map(v => `${v} 배지 소비량`), ...y.map(v => `${v} 버섯 kg`)],
+    ...MODELS.map(m => [m.name, m.cap, n(S.gram[m.key]), ...S.fac[m.key].map(n), ...S.fac[m.key].map(v => n(v) * m.cap), ...S.fac[m.key].map(v => n(v) * m.cap * n(S.gram[m.key]) / 1000)]),
+    ["합계", "", "", "", "", "", "", ...r.use, ...r.kg],
+    ["버섯 생산량 (톤)", "", "", "", "", "", "", "", "", "", "", ...r.kg.map(v => v / 1000)],
+  ], [12, 20, 16, 11, 11, 11, 11, 16, 16, 16, 16, 14, 14, 14, 14]), "생산시설");
 
   const I = S.invest;
   XLSX.utils.book_append_sheet(wb, sheet([
