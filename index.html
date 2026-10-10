@@ -98,6 +98,9 @@ button:disabled { opacity: 0.6; cursor: default; }
         </select>
       </label>
       <button id="xlsxBtn" type="button" class="primary">엑셀로 내보내기</button>
+      <button id="tplBtn" type="button">입력 양식 받기</button>
+      <button id="upBtn" type="button">연도별 입력 업로드</button>
+      <input id="upFile" type="file" accept=".xlsx,.xls,.csv" hidden>
       <button id="resetBtn" type="button">예시값으로 초기화</button>
     </div>
   </header>
@@ -504,12 +507,10 @@ let downloadsApi; // undefined = 아직 모름, null = 사용 불가
 if (window.claude && claude.use) claude.use("downloads").then(d => { downloadsApi = d; });
 const toast = msg => { $("toast").textContent = msg; };
 
-$("xlsxBtn").addEventListener("click", async e => {
+async function saveXlsx(wb, filename, btn) {
   if (typeof XLSX === "undefined") { toast("엑셀 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도하세요."); return; }
-  const filename = `버섯사업_손익계획_${years()[0]}-${years()[3]}.xlsx`;
-  const wb = buildWorkbook();
   if (downloadsApi) {
-    e.target.disabled = true;
+    btn.disabled = true;
     try {
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       await downloadsApi.save({ filename, data: new Blob([buf]) });
@@ -519,12 +520,89 @@ $("xlsxBtn").addEventListener("click", async e => {
       toast(code === "declined" ? "저장을 취소했습니다."
           : code === "rate_limited" ? "저장 확인 창이 이미 열려 있습니다. 잠시 후 다시 눌러 주세요."
           : "이 화면에서는 파일 저장을 할 수 없습니다.");
-    } finally { e.target.disabled = false; }
+    } finally { btn.disabled = false; }
   } else if (window.claude && claude.use && downloadsApi === undefined) {
     toast("저장 기능을 준비 중입니다. 잠시 후 다시 눌러 주세요.");
   } else {
-    XLSX.writeFile(wb, filename); // 로컬에서 직접 열었을 때
+    XLSX.writeFile(wb, filename); // 로컬·배포 페이지에서 직접 열었을 때
     toast(`${filename} 파일을 내려받았습니다.`);
+  }
+}
+$("xlsxBtn").addEventListener("click", e =>
+  saveXlsx(buildWorkbook(), `버섯사업_손익계획_${years()[0]}-${years()[3]}.xlsx`, e.target));
+
+// ---- 연도별 입력 업로드 ----
+// 양식의 각 행: 구분 | 항목 | 단위 | 1년차 | 2년차 | 3년차 | 4년차 | 코드(수정 금지)
+const YEAR_ROWS = [
+  ["배지", "단가", "원/개", "medium.price"],
+  ["배지", "판매량", "개", "medium.sales"],
+  ["배지", "생산량", "개", "medium.prod"],
+  ["버섯", "단가", "원/kg", "mushroom.price"],
+  ["버섯", "판매량", "kg", "mushroom.sales"],
+  ["모듈러", "단가", "원/대", "modular.price"],
+  ["모듈러", "판매량", "대", "modular.sales"],
+  ...MODELS.map(m => ["생산시설", `${m.name} 대수`, "대", `fac.${m.key}`]),
+  ["투자", "투자 내용", "글자", "invest.label"],
+  ["투자", "부지 면적", "평", "invest.landArea"],
+  ["투자", "부지 평당 단가", "원", "invest.landPrice"],
+  ["투자", "건축 면적", "평", "invest.bldgArea"],
+  ["투자", "건축 평당 단가", "원", "invest.bldgPrice"],
+];
+const TEMPLATE_SHEET = "연도별입력";
+
+function buildTemplate() {
+  const rows = [["구분", "항목", "단위", ...years().map(y => `${y}년`), "코드(수정 금지)"],
+    ...YEAR_ROWS.map(([g, item, unit, key]) => [g, item, unit, ...get(key).map(v => key === "invest.label" ? String(v) : n(v)), key])];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [10, 18, 8, 16, 16, 16, 16, 18].map(w => ({ wch: w }));
+  for (const ref in ws) if (ref[0] !== "!" && typeof ws[ref].v === "number") ws[ref].z = "#,##0.##";
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, TEMPLATE_SHEET);
+  return wb;
+}
+$("tplBtn").addEventListener("click", e => saveXlsx(buildTemplate(), "버섯사업_연도별입력_양식.xlsx", e.target));
+
+const toNum = v => {
+  if (v === undefined || v === null || v === "") return 0;
+  if (typeof v === "number") return v;
+  const x = Number(String(v).replace(/[,\s원개평대kg]/g, ""));
+  return isFinite(x) ? x : NaN;
+};
+function applyUpload(wb) {
+  const ws = wb.Sheets[TEMPLATE_SHEET] || wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+  if (!rows.length) return "파일에 내용이 없습니다.";
+  const byKey = Object.fromEntries(YEAR_ROWS.map(r => [r[3], r]));
+  const byLabel = Object.fromEntries(YEAR_ROWS.map(r => [`${r[0]}|${r[1]}`, r]));
+  const done = new Set(), skipped = new Set(), bad = [];
+  rows.slice(1).forEach((row, idx) => {
+    const def = byKey[String(row[7]).trim()] || byLabel[`${String(row[0]).trim()}|${String(row[1]).trim()}`];
+    if (!def) return;
+    const key = def[3];
+    const vals = [3, 4, 5, 6].map(c => key === "invest.label" ? String(row[c] ?? "") : toNum(row[c]));
+    if (vals.some(v => typeof v === "number" && (isNaN(v) || v < 0))) { bad.push(`${idx + 2}행 ${def[0]} ${def[1]}`); skipped.add(key); return; }
+    vals.forEach((v, i) => set(`${key}.${i}`, v));
+    done.add(key);
+  });
+  if (!done.size) return "반영할 행을 찾지 못했습니다. '입력 양식 받기'로 받은 파일 형식인지 확인하세요.";
+  const y0 = parseInt(String(rows[0][3]), 10);
+  if (y0 >= 1900 && y0 <= 2200) S.startYear = y0;
+  rebuild();
+  const missing = YEAR_ROWS.filter(r => !done.has(r[3]) && !skipped.has(r[3])).length;
+  return `${done.size}개 항목을 반영했습니다.` +
+    (missing ? ` 파일에 없는 ${missing}개 항목은 기존 값을 유지했습니다.` : "") +
+    (bad.length ? ` 숫자가 아니거나 음수라 건너뛴 행(기존 값 유지): ${bad.join(", ")}` : "");
+}
+$("upBtn").addEventListener("click", () => $("upFile").click());
+$("upFile").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  if (typeof XLSX === "undefined") { toast("엑셀 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도하세요."); return; }
+  try {
+    toast(applyUpload(XLSX.read(await f.arrayBuffer(), { type: "array" })));
+  } catch (err) {
+    toast("엑셀 파일을 읽지 못했습니다. .xlsx 파일인지 확인하세요.");
   }
 });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => update());
