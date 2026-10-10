@@ -3,16 +3,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: 좁은 단일 컬럼 작업지 — 요약(결과·그래프) 먼저, 입력 표는 아래 섹션별 */
+/* Layout: 좁은 단일 컬럼 작업지 — 요약(결과·그래프) 먼저, 입력과 연도별 상세는 아래 섹션별 */
 :root {
   --bg: #f3f4f1;
   --surface: #ffffff;
   --fg: #1d2420;
   --muted: #5e6862;
   --line: #d9ddd7;
-  --accent: #3d6b4f;      /* 이끼색: 배지 */
-  --c-mush: #b4772d;      /* 버섯 */
-  --c-mod: #4c6a8c;       /* 모듈러 */
+  --accent: #3d6b4f;      /* 이끼색: 자체 생산 */
+  --c-mush: #b4772d;      /* 위탁생산-모둘러 */
+  --c-med: #8c7b4a;       /* 배지 매출 */
+  --c-mod: #4c6a8c;       /* 모둘러 판매 */
+  --c-gross: #8a948e;     /* 매출이익 선 */
   --c-profit: #1d2420;    /* 영업이익 선 */
   --input-bg: #f8f9f6;
   --warn: #b3412e;
@@ -23,18 +25,18 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
-    --accent: #7fb08f; --c-mush: #d9a35d; --c-mod: #8eaccc; --c-profit: #e6ebe7;
+    --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #e6ebe7;
     --input-bg: #232b26; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
-  --accent: #7fb08f; --c-mush: #d9a35d; --c-mod: #8eaccc; --c-profit: #e6ebe7;
+  --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #e6ebe7;
   --input-bg: #232b26; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.55; margin: 0; }
-.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 28px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 28px; }
 header { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; justify-content: space-between; }
 h1 { font-size: 24px; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
 .sub { color: var(--muted); margin: 4px 0 0; }
@@ -51,6 +53,7 @@ th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: rig
 th:first-child, td:first-child { text-align: left; }
 thead th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
 td.num, td .num { font-family: var(--font-num); }
+td.fixed { font-family: var(--font-num); color: var(--muted); }
 tr.group td { padding-top: 14px; font-weight: 700; border-bottom: none; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); }
 tr.calc td { color: var(--muted); }
@@ -65,6 +68,8 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 500; }
 button.primary:hover { color: var(--surface); filter: brightness(1.08); }
 button:disabled { opacity: 0.6; cursor: default; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button[aria-pressed="true"] { background: var(--fg); border-color: var(--fg); color: var(--surface); }
 .toast { font-size: 12px; color: var(--muted); min-height: 1em; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
@@ -84,11 +89,10 @@ button:disabled { opacity: 0.6; cursor: default; }
   <header>
     <div>
       <h1>버섯사업 4개년 손익계획</h1>
-      <p class="sub">배지·버섯·모듈러 매출, 배지 재고, 버섯 자체 생산·수매, 투자비를 한 화면에서 계산합니다.</p>
+      <p class="sub">자체 생산 · 위탁생산(모둘러) · 배지 매출 · 모둘러 판매의 매출, 매출이익, 영업이익과 배지 재고, 투자비를 계산합니다.</p>
     </div>
     <div class="controls">
       <label class="ctl">시작 연도<input id="startYear" type="number" step="1"></label>
-      <label class="ctl">영업이익률 (%)<input id="margin" type="number" step="0.1"></label>
       <label class="ctl">표시 단위
         <select id="unitSel">
           <option value="1">원</option>
@@ -101,46 +105,41 @@ button:disabled { opacity: 0.6; cursor: default; }
       <button id="tplBtn" type="button">입력 양식 받기</button>
       <button id="upBtn" type="button">연도별 입력 업로드</button>
       <input id="upFile" type="file" accept=".xlsx,.xls,.csv" hidden>
-      <button id="resetBtn" type="button">예시값으로 초기화</button>
+      <button id="resetBtn" type="button">기본값으로 초기화</button>
     </div>
   </header>
 
   <p class="toast" id="toast" role="status"></p>
-  <p class="example" id="exampleNote">처음 열면 예시값이 채워져 있습니다. 실제 단가와 수량으로 바꿔 입력하세요. 입력값은 이 브라우저에 자동 저장됩니다.</p>
+  <p class="example">입력칸에는 "듀엘 매출액 예상.xlsx"의 숫자가 기본값으로 들어 있습니다. 입력값은 이 브라우저에 자동 저장됩니다.</p>
 
   <div class="kpis" id="kpis"></div>
 
   <section>
-    <h2>예상 매출 · 영업이익 <small id="unitLabel"></small></h2>
+    <h2>손익 요약 <small id="unitLabel"></small></h2>
     <div class="panel tbl-wrap"><table id="resultTbl"></table></div>
   </section>
 
   <section>
-    <h2>매출 · 영업이익 추이</h2>
-    <div class="panel"><div class="chart-box"><canvas id="chart" aria-label="연도별 매출과 영업이익 그래프"></canvas></div></div>
+    <h2>매출 · 이익 추이</h2>
+    <div class="panel"><div class="chart-box"><canvas id="chart" aria-label="연도별 매출, 매출이익, 영업이익 그래프"></canvas></div></div>
   </section>
 
   <section>
-    <h2>매출 입력 <small>연도별 단가(원)와 판매 수량</small></h2>
-    <div class="panel tbl-wrap"><table id="salesTbl"></table></div>
+    <h2>연도별 입력 <small>생산동수, 단가, 원가율, 판관비율</small></h2>
+    <div class="panel tbl-wrap"><table id="inTbl"></table></div>
+    <p class="note" id="fixedNote"></p>
   </section>
 
   <section>
-    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 판매량 − 시설 소비량</small></h2>
-    <label class="row note"><input type="checkbox" id="deduct"> 버섯 생산시설의 배지 소비량을 재고에서 차감</label>
+    <h2>연도별 상세 <small>엑셀 "매출액 예상" 시트와 같은 배치</small></h2>
+    <div class="tabs" id="yearTabs" role="group" aria-label="연도 선택"></div>
+    <div class="panel tbl-wrap"><table id="detailTbl"></table></div>
+  </section>
+
+  <section>
+    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 자체 생산 투입 − 모둘러 공급(배지 판매)</small></h2>
     <div class="panel tbl-wrap"><table id="mediumTbl"></table></div>
-  </section>
-
-  <section>
-    <h2>버섯 생산시설 (자체 생산) <small>가동 대수 → 배지 소비량 × 배지당 수확량(kg) = 자체 생산량</small></h2>
-    <div class="panel tbl-wrap"><table id="facTbl"></table></div>
-  </section>
-
-  <section>
-    <h2>버섯 수매 (모듈러 판매처) <small>판매한 모듈러의 생산량 전량 수매 · 대당 배지 연 18,000개 × 배지당 수확량(kg)</small></h2>
-    <label class="row note"><input type="checkbox" id="modCum"> 판매한 모듈러는 이후 연도에도 계속 가동 (누적 대수로 수매량 계산)</label>
-    <div class="panel tbl-wrap"><table id="buyTbl"></table></div>
-    <p class="note">버섯 판매량 = 자체 생산량 + 수매량 (전량 도매 판매). 버섯 매출 = 도매 판매가격 × 판매량.</p>
+    <div class="row"><button id="fillMedium" type="button">생산량을 필요량으로 채우기</button></div>
   </section>
 
   <section>
@@ -152,26 +151,28 @@ button:disabled { opacity: 0.6; cursor: default; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-const MODELS = [
-  { key: "m30",   name: "m30-54",    cap: 54000 },
-  { key: "m15",   name: "m15-27",    cap: 27000 },
-  { key: "m3000", name: "m3000-100", cap: 1000000 },
-  { key: "m6000", name: "m6000-200", cap: 2000000 },
-  { key: "mod",   name: "모듈러",     cap: 18000 },
+// 고정값 (엑셀의 숫자 셀)
+const FIX = { selfPer: 3000, modPer: 1000, turns: 18, firstYear: 0.5 };
+const COLS = [
+  { key: "own",  name: "자체 생산",        color: "--accent" },
+  { key: "mod",  name: "위탁생산-모둘러",   color: "--c-mush" },
+  { key: "med",  name: "위탁생산-배지매출", color: "--c-med" },
+  { key: "sale", name: "모둘러 판매",       color: "--c-mod" },
 ];
 const PYEONG_M2 = 3.305785;
 const STORE_KEY = "mushroom-forecast-v1";
-const DATA_VER = 3; // 2: 모델 숫자 = 연간 배지 소비량, 버섯 kg 단위 / 3: 모듈러 수매 + 배지당 수확량(kg)
+const DATA_VER = 4; // 4: "듀엘 매출액 예상.xlsx" 구조
 
-// 예시값 — 실제 수치가 아님
+// 기본값 = 엑셀 입력칸의 숫자
 function defaults() {
   return {
-    startYear: 2027, margin: 50, unit: 1000000,
-    ver: DATA_VER, deduct: true, modCum: true,
-    medium:   { price: [1200, 1200, 1250, 1300], prod: [1600000, 1700000, 11800000, 12000000], sales: [400000, 500000, 600000, 800000], opening: 0 },
-    mushroom: { price: [5000, 5000, 5200, 5400], buyPrice: [3500, 3500, 3600, 3700], yieldKg: [0.3, 0.3, 0.3, 0.3] },
-    modular:  { price: [40000000, 40000000, 41000000, 42000000], sales: [2, 5, 8, 12] },
-    fac: { m30: [1, 1, 1, 1], m15: [1, 1, 1, 1], m3000: [1, 1, 1, 1], m6000: [0, 0, 5, 5], mod: [1, 1, 2, 2] },
+    ver: DATA_VER, startYear: 2027, unit: 1000000,
+    dong:   { self: [6, 6, 20, 50], mod: [20, 50, 100, 200] },
+    yieldKg: [0.8, 0.8, 0.8, 0.8],
+    price:  { mush: [12000, 12000, 12000, 12000], buy: [8000, 8000, 8000, 8000], medium: [3500, 3500, 3500, 3500], modular: [75000000, 75000000, 75000000, 75000000] },
+    cost:   { self: [40, 40, 40, 40], medium: [33, 33, 33, 33], modSale: [66.7, 50, 50, 50] },
+    sga: [0, 0, 0, 0],
+    medium: { opening: 0, prod: [342000, 954000, 2052000, 4590000] },
     invest: {
       label:     ["1차: 100만개 시설", "", "2차: 1,000만개 시설", ""],
       landArea:  [1500, 0, 6000, 0],
@@ -183,14 +184,12 @@ function defaults() {
 }
 let S;
 try { S = JSON.parse(localStorage.getItem(STORE_KEY)) || defaults(); } catch (e) { S = defaults(); }
-// 이전 버전(투자비 1회 입력) 저장값은 연도별 형식으로 교체
-if (!S.invest || !Array.isArray(S.invest.landArea)) S.invest = defaults().invest;
-// 이전 버전 저장값: 버섯이 '개' 단위였으므로 kg 기준 예시값으로 교체
 if (S.ver !== DATA_VER) {
+  // 이전 구조의 저장값: 투자 계획·시작 연도·단위만 살리고 나머지는 엑셀 기본값으로
   const d = defaults();
-  if ((S.ver || 1) < 2) Object.assign(S, { deduct: d.deduct, medium: d.medium });
-  Object.assign(S, { ver: d.ver, modCum: d.modCum, mushroom: d.mushroom });
-  delete S.gram;
+  const keep = { startYear: S.startYear || d.startYear, unit: S.unit || d.unit };
+  if (S.invest && Array.isArray(S.invest.landArea)) keep.invest = S.invest;
+  S = Object.assign(d, keep);
 }
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
 
@@ -199,11 +198,9 @@ const n = v => (isFinite(+v) ? +v : 0);
 const fmtInt = v => Math.round(v).toLocaleString("ko-KR");
 const sumArr = a => a.reduce((x, y) => x + y, 0);
 const fmtTon = kg => (kg / 1000).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+const fmtPct = r => (isFinite(r) ? (r * 100).toLocaleString("ko-KR", { maximumFractionDigits: 1 }) + "%" : "–");
 const unitName = () => ({ 1: "원", 1000: "천원", 1000000: "백만원", 100000000: "억원" })[S.unit];
-const money = v => {
-  const x = v / S.unit;
-  return x.toLocaleString("ko-KR", { maximumFractionDigits: S.unit >= 1000000 ? 1 : 0 });
-};
+const money = v => (v / S.unit).toLocaleString("ko-KR", { maximumFractionDigits: S.unit >= 1000000 ? 1 : 0 });
 const years = () => [0, 1, 2, 3].map(i => n(S.startYear) + i);
 const get = path => path.split(".").reduce((o, k) => o[k], S);
 function set(path, v) {
@@ -214,91 +211,99 @@ const inp = (path, step = "1") => `<input type="number" min="0" step="${step}" i
 const esc = v => String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const txt = path => `<input type="text" class="txt" id="i-${path.replace(/\./g, "-")}" data-path="${path}" data-text="1" value="${esc(get(path))}" placeholder="예: 1차 투자">`;
 
-function calc() {
-  const r = { medium: [], mushroom: [], modular: [], total: [], profit: [], use: [], kg: [], modCum: [], buyUse: [], buyKg: [], sellKg: [], buyCost: [], inv: [] };
-  const MOD_CAP = MODELS.find(m => m.key === "mod").cap;
-  let modAcc = 0;
-  let stock = n(S.medium.opening);
-  for (let i = 0; i < 4; i++) {
-    r.medium[i] = n(S.medium.price[i]) * n(S.medium.sales[i]);
-    r.modular[i] = n(S.modular.price[i]) * n(S.modular.sales[i]);
-    const yk = n(S.mushroom.yieldKg[i]);
-    r.use[i] = MODELS.reduce((s, m) => s + n(S.fac[m.key][i]) * m.cap, 0);
-    r.kg[i] = r.use[i] * yk;                                   // 자체 생산량
-    modAcc += n(S.modular.sales[i]);
-    r.modCum[i] = S.modCum ? modAcc : n(S.modular.sales[i]);  // 수매 대상 모듈러 대수
-    r.buyUse[i] = r.modCum[i] * MOD_CAP;
-    r.buyKg[i] = r.buyUse[i] * yk;                             // 수매량 (전량)
-    r.sellKg[i] = r.kg[i] + r.buyKg[i];                        // 전량 도매 판매
-    r.buyCost[i] = r.buyKg[i] * n(S.mushroom.buyPrice[i]);
-    r.mushroom[i] = r.sellKg[i] * n(S.mushroom.price[i]);
-    r.total[i] = r.medium[i] + r.mushroom[i] + r.modular[i];
-    r.profit[i] = r.total[i] * n(S.margin) / 100;
-    const open = stock;
-    stock = open + n(S.medium.prod[i]) - n(S.medium.sales[i]) - (S.deduct ? r.use[i] : 0);
-    r.inv[i] = { open, close: stock };
+// ---- 계산 (엑셀 수식과 동일, 2030 자체 생산은 다른 해와 같은 수식으로 정정) ----
+function calcYear(i) {
+  const self = n(S.dong.self[i]), mod = n(S.dong.mod[i]);
+  const newSelf = self - (i ? n(S.dong.self[i - 1]) : 0);     // 신규증가 = 당해 − 전년
+  const newMod = mod - (i ? n(S.dong.mod[i - 1]) : 0);
+  // 배지 투입수 = 신규×입상수×회전수×0.5 + 기존×입상수×회전수
+  const inSelf = newSelf * FIX.selfPer * FIX.turns * FIX.firstYear + (self - newSelf) * FIX.selfPer * FIX.turns;
+  const inMod = newMod * FIX.modPer * FIX.turns * FIX.firstYear + (mod - newMod) * FIX.modPer * FIX.turns;
+  const yk = n(S.yieldKg[i]);
+  const kgSelf = inSelf * yk, kgMod = inMod * yk;
+  const mush = n(S.price.mush[i]);
+  const rev = {
+    own: mush * kgSelf,
+    mod: mush * kgMod,
+    med: n(S.price.medium[i]) * inMod,          // 배지 판매수 = 모둘러 배지 투입수
+    sale: newMod * n(S.price.modular[i]),        // 모둘러 판매 = 신규 대수 × 단가
+  };
+  const cr = {
+    own: n(S.cost.self[i]) / 100,
+    mod: mush ? n(S.price.buy[i]) / mush : 0,    // 수매단가 ÷ 판매단가
+    med: n(S.cost.medium[i]) / 100,
+    sale: n(S.cost.modSale[i]) / 100,
+  };
+  const sgaRate = n(S.sga[i]) / 100;
+  const cogs = {}, gross = {}, sga = {}, op = {};
+  for (const c of COLS) {
+    cogs[c.key] = rev[c.key] * cr[c.key];
+    gross[c.key] = rev[c.key] - cogs[c.key];
+    sga[c.key] = rev[c.key] * sgaRate;
+    op[c.key] = gross[c.key] - sga[c.key];
   }
-  const sum = a => a.reduce((x, y) => x + y, 0);
-  r.sum = { medium: sum(r.medium), mushroom: sum(r.mushroom), modular: sum(r.modular), total: sum(r.total), profit: sum(r.profit) };
+  for (const o of [rev, cogs, gross, sga, op]) o.total = COLS.reduce((s, c) => s + o[c.key], 0);
+  return { self, mod, newSelf, newMod, inSelf, inMod, yk, kgSelf, kgMod, rev, cr, cogs, gross, sga, op };
+}
+function calc() {
+  const Y = [0, 1, 2, 3].map(calcYear);
+  let stock = n(S.medium.opening);
+  Y.forEach((y, i) => {
+    const open = stock;
+    stock = open + n(S.medium.prod[i]) - y.inSelf - y.inMod;
+    y.inv = { open, close: stock, need: y.inSelf + y.inMod };
+  });
   const I = S.invest;
-  r.land = [0, 1, 2, 3].map(i => n(I.landArea[i]) * n(I.landPrice[i]));
-  r.bldg = [0, 1, 2, 3].map(i => n(I.bldgArea[i]) * n(I.bldgPrice[i]));
-  r.inv_y = [0, 1, 2, 3].map(i => r.land[i] + r.bldg[i]);
-  r.inv_cum = r.inv_y.map((v, i) => r.inv_y.slice(0, i + 1).reduce((a, b) => a + b, 0));
-  r.landArea = sum(I.landArea.map(n));
-  r.bldgArea = sum(I.bldgArea.map(n));
-  r.investTotal = sum(r.inv_y);
-  return r;
+  const land = [0, 1, 2, 3].map(i => n(I.landArea[i]) * n(I.landPrice[i]));
+  const bldg = [0, 1, 2, 3].map(i => n(I.bldgArea[i]) * n(I.bldgPrice[i]));
+  const invY = land.map((v, i) => v + bldg[i]);
+  return {
+    Y, land, bldg, invY,
+    invCum: invY.map((v, i) => sumArr(invY.slice(0, i + 1))),
+    investTotal: sumArr(invY),
+    landArea: sumArr(I.landArea.map(n)), bldgArea: sumArr(I.bldgArea.map(n)),
+  };
 }
 
 const yearHead = (first, extra = "") => `<thead><tr><th>${first}</th>${years().map(y => `<th>${y}년</th>`).join("")}${extra}</tr></thead>`;
+let detailYear = 0;
 
 // 입력 표는 한 번만 그리고, 계산 셀만 갱신해서 입력 포커스를 유지한다
 function buildInputs() {
   const row = (label, unit, path, step) =>
     `<tr><td>${label}<span class="unit">${unit}</span></td>${[0,1,2,3].map(i => `<td>${inp(`${path}.${i}`, step)}</td>`).join("")}</tr>`;
-  const numRow = (label, unit, id) =>
+  const crow = (label, unit, id) =>
     `<tr class="calc"><td>${label}<span class="unit">${unit}</span></td>${[0,1,2,3].map(i => `<td class="num" id="${id}-${i}"></td>`).join("")}</tr>`;
-  const calcRow = (label, id) =>
-    `<tr class="calc"><td>${label}<span class="unit">${unitName()}</span></td>${[0,1,2,3].map(i => `<td class="num" id="${id}-${i}"></td>`).join("")}</tr>`;
+  const group = (label, color) => `<tr class="group"><td>${color ? `<span class="dot" style="background:var(${color})"></span>` : ""}${label}</td><td colspan="4"></td></tr>`;
 
-  $("salesTbl").innerHTML = yearHead("항목") + "<tbody>" +
-    `<tr class="group"><td><span class="dot" style="background:var(--accent)"></span>배지</td><td colspan="4"></td></tr>` +
-    row("단가", "원/개", "medium.price") + row("판매량", "개", "medium.sales") + calcRow("매출", "c-med") +
-    `<tr class="group"><td><span class="dot" style="background:var(--c-mush)"></span>버섯</td><td colspan="4"></td></tr>` +
-    row("도매 판매가격", "원/kg", "mushroom.price") +
-    numRow("자체 생산량", "kg", "c-ownkg") + numRow("수매량", "kg", "c-buykg2") + numRow("판매량", "kg · 자체+수매 전량", "c-sellkg") +
-    calcRow("매출", "c-mush") +
-    `<tr class="group"><td><span class="dot" style="background:var(--c-mod)"></span>모듈러</td><td colspan="4"></td></tr>` +
-    row("단가", "원/대", "modular.price") + row("판매량", "대", "modular.sales") + numRow("누적 판매", "대", "c-modcum") + calcRow("매출", "c-mod") +
+  $("inTbl").innerHTML = yearHead("항목") + "<tbody>" +
+    group("생산동수") +
+    row("자체 생산", "동", "dong.self") + crow("신규증가", "동 · 전년 대비", "c-newself") +
+    row("모둘러", "대", "dong.mod") + crow("신규증가", "대 · 전년 대비", "c-newmod") +
+    group("버섯") +
+    row("배지당 수확량", "kg", "yieldKg", "0.01") +
+    row("판매단가", "원/kg", "price.mush") +
+    row("수매단가", "원/kg · 모둘러 위탁", "price.buy") +
+    group("배지", "--c-med") + row("판매단가", "원/개", "price.medium") +
+    group("모둘러", "--c-mod") + row("판매단가", "원/대", "price.modular") +
+    group("매출원가율 (%)") +
+    row("자체 생산", "%", "cost.self", "0.1") +
+    crow("위탁생산-모둘러", "% · 수매단가 ÷ 판매단가", "c-crmod") +
+    row("배지 매출", "%", "cost.medium", "0.1") +
+    row("모둘러 판매", "%", "cost.modSale", "0.1") +
+    group("판매관리비율 (%)") +
+    row("판관비율", "% · 모든 매출에 적용", "sga", "0.1") +
     "</tbody>";
+  $("fixedNote").textContent = `고정값: 1회 배지 입상수 자체 생산 ${fmtInt(FIX.selfPer)}개/동, 모둘러 ${fmtInt(FIX.modPer)}개/대 · 연간 회전수 ${FIX.turns}회(20일) · 신규 동은 첫해 ${FIX.firstYear * 100}%만 가동`;
+
+  $("yearTabs").innerHTML = years().map((y, i) => `<button type="button" data-year="${i}" aria-pressed="${i === detailYear}">${y}년 (${i + 1}년차)</button>`).join("");
 
   $("mediumTbl").innerHTML = yearHead("항목") + "<tbody>" +
     `<tr><td>기초재고<span class="unit">개</span></td><td>${inp("medium.opening")}</td>${[1,2,3].map(i => `<td class="num" id="c-open-${i}"></td>`).join("")}</tr>` +
     row("생산량", "개", "medium.prod") +
-    `<tr class="calc"><td>판매량<span class="unit">개 · 매출 입력 표에서</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-msales-${i}"></td>`).join("")}</tr>` +
-    `<tr class="calc"><td>시설 소비량<span class="unit">개 · 생산시설 표에서</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-muse-${i}"></td>`).join("")}</tr>` +
+    crow("자체 생산 투입", "개", "c-inself") +
+    crow("모둘러 공급 (배지 판매)", "개", "c-inmod") +
     `<tr class="total"><td>기말재고<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-close-${i}"></td>`).join("")}</tr>` +
-    "</tbody>";
-
-  const fcalc = (label, unit, id, cls = "calc") =>
-    `<tr class="${cls}"><td>${label}<span class="unit">${unit}</span></td>${[0,1,2,3].map(i => `<td class="num" id="${id}-${i}"></td>`).join("")}</tr>`;
-  $("facTbl").innerHTML = yearHead("모델 (대수 입력)") + "<tbody>" +
-    MODELS.map(m => `<tr><td>${m.name}<span class="unit">대 · 배지 연 ${fmtInt(m.cap)}개/대</span></td>${[0,1,2,3].map(i => `<td>${inp(`fac.${m.key}.${i}`)}</td>`).join("")}</tr>`).join("") +
-    fcalc("배지 소비량", "개", "c-use", "total") +
-    fcalc("배지당 수확량", "kg · 수매 표와 동일", "c-yield") +
-    fcalc("자체 생산량", "kg", "c-kg", "profit") +
-    fcalc("자체 생산량", "톤", "c-ton") +
-    "</tbody>";
-
-  $("buyTbl").innerHTML = yearHead("항목") + "<tbody>" +
-    row("배지당 수확량", "kg · 자체 생산에도 적용", "mushroom.yieldKg", "0.01") +
-    row("수매 가격", "원/kg", "mushroom.buyPrice") +
-    fcalc("수매 대상 모듈러", "대", "c-modcum2") +
-    fcalc("모듈러 배지 소비량", "개", "c-buyuse") +
-    fcalc("수매량", "kg", "c-buykg", "profit") +
-    fcalc("수매량", "톤", "c-buyton") +
-    fcalc("수매 금액", unitName(), "c-buycost", "total") +
     "</tbody>";
 
   const ir = (label, unit, cells, cls = "") => `<tr class="${cls}"><td>${label}<span class="unit">${unit}</span></td>${cells}</tr>`;
@@ -321,94 +326,111 @@ function buildInputs() {
     "</tbody>";
 
   $("startYear").value = S.startYear;
-  $("margin").value = S.margin;
-  $("deduct").checked = !!S.deduct;
-  $("modCum").checked = !!S.modCum;
   $("unitSel").value = String(S.unit);
 }
 
+function renderDetail(R) {
+  const y = R.Y[detailYear];
+  const c = v => `<td class="num">${v}</td>`;
+  const f = v => `<td class="fixed">${v}</td>`;
+  const e = "<td></td>";
+  const tr = (label, unit, cells, cls = "") => `<tr class="${cls}"><td>${label}<span class="unit">${unit}</span></td>${cells}</tr>`;
+  const moneyRow = (label, o, cls = "") => tr(label, unitName(), COLS.map(k => c(money(o[k.key]))).join("") + c(money(o.total)), cls);
+  const rateRow = (label, num, den, cls = "") => tr(label, "", COLS.map(k => c(fmtPct(num[k.key] / den[k.key]))).join("") + c(fmtPct(num.total / den.total)), cls);
+  $("detailTbl").innerHTML =
+    `<thead><tr><th>구분</th>${COLS.map(k => `<th><span class="dot" style="background:var(${k.color})"></span>${k.name}</th>`).join("")}<th>합계</th></tr></thead><tbody>` +
+    tr("생산동수", "동·대", c(fmtInt(y.self)) + c(fmtInt(y.mod)) + c(fmtInt(y.mod)) + e + e) +
+    tr("신규증가", "전년 대비", c(fmtInt(y.newSelf)) + c(fmtInt(y.newMod)) + c(fmtInt(y.newMod)) + c(fmtInt(y.newMod)) + e) +
+    tr("대당 배지 입상수 1회", "개", f(fmtInt(FIX.selfPer)) + f(fmtInt(FIX.modPer)) + f(fmtInt(FIX.modPer)) + e + e) +
+    tr("연간 회전수 (20일)", "회", f(FIX.turns) + f(FIX.turns) + f(FIX.turns) + e + e) +
+    tr("배지당 수확량", "kg", c(y.yk) + c(y.yk) + e + e + e) +
+    tr("배지 투입수 (판매수)", "개", c(fmtInt(y.inSelf)) + c(fmtInt(y.inMod)) + c(fmtInt(y.inMod)) + e + c(fmtInt(y.inSelf + 2 * y.inMod))) +
+    tr("버섯 생산량", "kg", c(fmtInt(y.kgSelf)) + c(fmtInt(y.kgMod)) + e + e + c(fmtInt(y.kgSelf + y.kgMod)), "profit") +
+    tr("톤 환산", "t", c(fmtTon(y.kgSelf)) + c(fmtTon(y.kgMod)) + e + e + c(fmtTon(y.kgSelf + y.kgMod))) +
+    tr("배지 판매단가", "원/개", e + e + c(fmtInt(S.price.medium[detailYear])) + e + e) +
+    tr("수매단가", "원/kg", e + c(fmtInt(S.price.buy[detailYear])) + e + e + e) +
+    tr("판매단가", "원/kg · 원/대", c(fmtInt(S.price.mush[detailYear])) + c(fmtInt(S.price.mush[detailYear])) + e + c(fmtInt(S.price.modular[detailYear])) + e) +
+    tr("매출원가율", "", COLS.map(k => c(fmtPct(y.cr[k.key]))).join("") + e) +
+    moneyRow("연간 매출액", y.rev, "total") +
+    moneyRow("매출원가", y.cogs) +
+    moneyRow("매출이익", y.gross, "profit") +
+    rateRow("매출이익률", y.gross, y.rev, "calc") +
+    moneyRow(`판매관리비 (${n(S.sga[detailYear])}%)`, y.sga) +
+    moneyRow("영업이익", y.op, "profit") +
+    rateRow("영업이익률", y.op, y.rev, "calc") +
+    "</tbody>";
+}
+
 function update() {
-  const r = calc();
+  const R = calc();
   const t = (id, v) => { const el = $(id); if (el) el.innerHTML = v; };
-  for (let i = 0; i < 4; i++) {
-    t(`c-med-${i}`, money(r.medium[i]));
-    t(`c-mush-${i}`, money(r.mushroom[i]));
-    t(`c-mod-${i}`, money(r.modular[i]));
-    t(`c-use-${i}`, fmtInt(r.use[i]));
-    t(`c-kg-${i}`, fmtInt(r.kg[i]));
-    t(`c-ton-${i}`, fmtTon(r.kg[i]));
-    t(`c-yield-${i}`, n(S.mushroom.yieldKg[i]).toLocaleString("ko-KR", { maximumFractionDigits: 3 }));
-    t(`c-ownkg-${i}`, fmtInt(r.kg[i]));
-    t(`c-buykg2-${i}`, fmtInt(r.buyKg[i]));
-    t(`c-sellkg-${i}`, fmtInt(r.sellKg[i]));
-    t(`c-modcum-${i}`, fmtInt(r.modCum[i]));
-    t(`c-modcum2-${i}`, fmtInt(r.modCum[i]));
-    t(`c-buyuse-${i}`, fmtInt(r.buyUse[i]));
-    t(`c-buykg-${i}`, fmtInt(r.buyKg[i]));
-    t(`c-buyton-${i}`, fmtTon(r.buyKg[i]));
-    t(`c-buycost-${i}`, money(r.buyCost[i]));
-    t(`c-muse-${i}`, S.deduct ? fmtInt(r.use[i]) : `<span class="note">차감 안 함 (${fmtInt(r.use[i])})</span>`);
-    t(`c-msales-${i}`, fmtInt(n(S.medium.sales[i])));
-    if (i > 0) t(`c-open-${i}`, fmtInt(r.inv[i].open));
-    const neg = r.inv[i].close < 0;
-    t(`c-close-${i}`, `<span class="${neg ? "warn" : ""}">${fmtInt(r.inv[i].close)}</span>` + (neg ? `<span class="badge">재고 부족</span>` : ""));
-  }
-  for (let i = 0; i < 4; i++) {
+  R.Y.forEach((y, i) => {
+    t(`c-newself-${i}`, fmtInt(y.newSelf) + (y.newSelf < 0 ? `<span class="badge">감소</span>` : ""));
+    t(`c-newmod-${i}`, fmtInt(y.newMod) + (y.newMod < 0 ? `<span class="badge">감소</span>` : ""));
+    t(`c-crmod-${i}`, fmtPct(y.cr.mod));
+    t(`c-inself-${i}`, fmtInt(y.inSelf));
+    t(`c-inmod-${i}`, fmtInt(y.inMod));
+    if (i > 0) t(`c-open-${i}`, fmtInt(y.inv.open));
+    const neg = y.inv.close < 0;
+    t(`c-close-${i}`, `<span class="${neg ? "warn" : ""}">${fmtInt(y.inv.close)}</span>` + (neg ? `<span class="badge">재고 부족</span>` : ""));
     t(`c-landm2-${i}`, fmtInt(n(S.invest.landArea[i]) * PYEONG_M2));
     t(`c-bldgm2-${i}`, fmtInt(n(S.invest.bldgArea[i]) * PYEONG_M2));
-    t(`c-land-${i}`, money(r.land[i]));
-    t(`c-bldg-${i}`, money(r.bldg[i]));
-    t(`c-invy-${i}`, money(r.inv_y[i]));
-    t(`c-invcum-${i}`, money(r.inv_cum[i]));
-  }
-  t("c-landm2-t", fmtInt(r.landArea * PYEONG_M2));
-  t("c-bldgm2-t", fmtInt(r.bldgArea * PYEONG_M2));
-  t("c-land-t", money(r.land.reduce((a, b) => a + b, 0)));
-  t("c-bldg-t", money(r.bldg.reduce((a, b) => a + b, 0)));
-  t("c-invy-t", money(r.investTotal));
+    t(`c-land-${i}`, money(R.land[i]));
+    t(`c-bldg-${i}`, money(R.bldg[i]));
+    t(`c-invy-${i}`, money(R.invY[i]));
+    t(`c-invcum-${i}`, money(R.invCum[i]));
+  });
+  t("c-landm2-t", fmtInt(R.landArea * PYEONG_M2));
+  t("c-bldgm2-t", fmtInt(R.bldgArea * PYEONG_M2));
+  t("c-land-t", money(sumArr(R.land)));
+  t("c-bldg-t", money(sumArr(R.bldg)));
+  t("c-invy-t", money(R.investTotal));
 
-  // 결과표
-  const line = (label, arr, total, cls = "", dot = "") =>
-    `<tr class="${cls}"><td>${dot ? `<span class="dot" style="background:${dot}"></span>` : ""}${label}</td>${arr.map(v => `<td class="num">${money(v)}</td>`).join("")}<td class="num">${money(total)}</td></tr>`;
+  // 손익 요약
+  const sum = f => sumArr(R.Y.map(f));
+  const line = (label, f, cls = "", dot = "") =>
+    `<tr class="${cls}"><td>${dot ? `<span class="dot" style="background:var(${dot})"></span>` : ""}${label}</td>${R.Y.map(y => `<td class="num">${money(f(y))}</td>`).join("")}<td class="num">${money(sum(f))}</td></tr>`;
+  const rate = (label, fn, fd) =>
+    `<tr class="calc"><td>${label}</td>${R.Y.map(y => `<td class="num">${fmtPct(fn(y) / fd(y))}</td>`).join("")}<td class="num">${fmtPct(sum(fn) / sum(fd))}</td></tr>`;
+  const qty = (label, f, fmt) =>
+    `<tr class="calc"><td>${label}</td>${R.Y.map(y => `<td class="num">${fmt(f(y))}</td>`).join("")}<td class="num">${fmt(sum(f))}</td></tr>`;
   $("resultTbl").innerHTML = yearHead("구분", "<th>4년 합계</th>") + "<tbody>" +
-    line("배지 매출", r.medium, r.sum.medium, "", "var(--accent)") +
-    line("버섯 매출", r.mushroom, r.sum.mushroom, "", "var(--c-mush)") +
-    line("모듈러 매출", r.modular, r.sum.modular, "", "var(--c-mod)") +
-    line("매출 합계", r.total, r.sum.total, "total") +
-    line(`영업이익 (${n(S.margin)}%)`, r.profit, r.sum.profit, "profit") +
-    line("투자비", r.inv_y, r.investTotal, "calc") +
-    `<tr class="calc"><td>배지 소비량 (개)</td>${r.use.map(v => `<td class="num">${fmtInt(v)}</td>`).join("")}<td class="num">${fmtInt(sumArr(r.use))}</td></tr>` +
-    `<tr class="calc"><td>버섯 판매량 (톤 · 자체+수매)</td>${r.sellKg.map(v => `<td class="num">${fmtTon(v)}</td>`).join("")}<td class="num">${fmtTon(sumArr(r.sellKg))}</td></tr>` +
-    line("버섯 수매 금액 (참고)", r.buyCost, sumArr(r.buyCost), "calc") +
-    `<tr class="calc"><td>배지 기말재고 (개)</td>${r.inv.map(x => `<td class="num">${fmtInt(x.close)}</td>`).join("")}<td></td></tr>` +
+    COLS.map(c => line(`${c.name} 매출`, y => y.rev[c.key], "", c.color)).join("") +
+    line("매출 합계", y => y.rev.total, "total") +
+    line("매출원가", y => y.cogs.total) +
+    line("매출이익", y => y.gross.total, "profit") +
+    rate("매출이익률", y => y.gross.total, y => y.rev.total) +
+    line("판매관리비", y => y.sga.total) +
+    line("영업이익", y => y.op.total, "profit") +
+    rate("영업이익률", y => y.op.total, y => y.rev.total) +
+    qty("버섯 생산량 (톤 · 자체+모둘러)", y => y.kgSelf + y.kgMod, fmtTon) +
+    `<tr class="calc"><td>배지 기말재고 (개)</td>${R.Y.map(y => `<td class="num">${fmtInt(y.inv.close)}</td>`).join("")}<td></td></tr>` +
+    `<tr class="calc"><td>투자비</td>${R.invY.map(v => `<td class="num">${money(v)}</td>`).join("")}<td class="num">${money(R.investTotal)}</td></tr>` +
     "</tbody>";
   $("unitLabel").textContent = `단위: ${unitName()}`;
 
-  // KPI
-  const y = years();
   $("kpis").innerHTML = [
-    ["4년 누적 매출", money(r.sum.total) + `<span class="unit">${unitName()}</span>`],
-    ["4년 누적 영업이익", money(r.sum.profit) + `<span class="unit">${unitName()}</span>`],
-    [`${y[3]}년 매출`, money(r.total[3]) + `<span class="unit">${unitName()}</span>`],
-    ["총 투자비용", money(r.investTotal) + `<span class="unit">${unitName()}</span>`],
-  ].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+    ["4년 누적 매출", sum(y => y.rev.total)],
+    ["4년 누적 매출이익", sum(y => y.gross.total)],
+    ["4년 누적 영업이익", sum(y => y.op.total)],
+    ["총 투자비용", R.investTotal],
+  ].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${money(v)}<span class="unit">${unitName()}</span></div></div>`).join("");
 
-  drawChart(r);
+  renderDetail(R);
+  drawChart(R);
   save();
 }
 
 let chart;
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-function drawChart(r) {
+function drawChart(R) {
   if (typeof Chart === "undefined") return;
-  const d = arr => arr.map(v => +(v / S.unit).toFixed(2));
+  const d = f => R.Y.map(y => +(f(y) / S.unit).toFixed(2));
   const labels = years().map(y => `${y}년`);
   const ds = [
-    { type: "bar", label: "배지 매출", data: d(r.medium), backgroundColor: css("--accent"), stack: "s", order: 2 },
-    { type: "bar", label: "버섯 매출", data: d(r.mushroom), backgroundColor: css("--c-mush"), stack: "s", order: 2 },
-    { type: "bar", label: "모듈러 매출", data: d(r.modular), backgroundColor: css("--c-mod"), stack: "s", order: 2 },
-    { type: "line", label: "영업이익", data: d(r.profit), borderColor: css("--c-profit"), backgroundColor: css("--c-profit"),
-      borderWidth: 2, pointRadius: 4, tension: 0.2, order: 1 },
+    ...COLS.map(c => ({ type: "bar", label: `${c.name} 매출`, data: d(y => y.rev[c.key]), backgroundColor: css(c.color), stack: "s", order: 3 })),
+    { type: "line", label: "매출이익", data: d(y => y.gross.total), borderColor: css("--c-gross"), backgroundColor: css("--c-gross"), borderDash: [6, 4], borderWidth: 2, pointRadius: 3, tension: 0.2, order: 2 },
+    { type: "line", label: "영업이익", data: d(y => y.op.total), borderColor: css("--c-profit"), backgroundColor: css("--c-profit"), borderWidth: 2, pointRadius: 4, tension: 0.2, order: 1 },
   ];
   const fg = css("--muted"), grid = css("--line");
   if (chart) {
@@ -444,112 +466,118 @@ document.addEventListener("input", e => {
   if (p) { set(p, e.target.value === "" ? 0 : +e.target.value); update(); }
 });
 $("startYear").addEventListener("input", e => { S.startYear = +e.target.value || 2027; rebuild(); });
-$("margin").addEventListener("input", e => { S.margin = +e.target.value; update(); });
-$("deduct").addEventListener("change", e => { S.deduct = e.target.checked; update(); });
 $("unitSel").addEventListener("change", e => { S.unit = +e.target.value; rebuild(); });
-$("modCum").addEventListener("change", e => { S.modCum = e.target.checked; update(); });
+$("yearTabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-year]");
+  if (!b) return;
+  detailYear = +b.dataset.year;
+  [...$("yearTabs").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderDetail(calc());
+});
+$("fillMedium").addEventListener("click", () => {
+  const R = calc();
+  // 기초재고를 감안해 기말재고가 0이 되도록 생산량을 맞춘다
+  let stock = n(S.medium.opening);
+  R.Y.forEach((y, i) => { S.medium.prod[i] = Math.max(0, y.inv.need - stock); stock += S.medium.prod[i] - y.inv.need; });
+  rebuild();
+});
 let confirmReset = false;
 $("resetBtn").addEventListener("click", e => {
-  if (!confirmReset) { confirmReset = true; e.target.textContent = "한 번 더 누르면 초기화"; setTimeout(() => { confirmReset = false; e.target.textContent = "예시값으로 초기화"; }, 3000); return; }
-  confirmReset = false; e.target.textContent = "예시값으로 초기화";
+  if (!confirmReset) { confirmReset = true; e.target.textContent = "한 번 더 누르면 초기화"; setTimeout(() => { confirmReset = false; e.target.textContent = "기본값으로 초기화"; }, 3000); return; }
+  confirmReset = false; e.target.textContent = "기본값으로 초기화";
   S = defaults(); rebuild();
 });
 function rebuild() { buildInputs(); update(); }
 
 // ---- 엑셀 내보내기 (금액은 원 단위 숫자) ----
 function buildWorkbook() {
-  const r = calc();
+  const R = calc();
   const y = years().map(v => `${v}년`);
   const sheet = (rows, widths) => {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws["!cols"] = widths.map(w => ({ wch: w }));
     for (const ref in ws) {
       if (ref[0] === "!") continue;
-      if (typeof ws[ref].v === "number") ws[ref].z = Number.isInteger(ws[ref].v) ? "#,##0" : "#,##0.0";
+      if (typeof ws[ref].v === "number") ws[ref].z = Number.isInteger(ws[ref].v) ? "#,##0" : "#,##0.0##";
     }
     return ws;
   };
+  const sumY = f => sumArr(R.Y.map(f));
   const wb = XLSX.utils.book_new();
 
   XLSX.utils.book_append_sheet(wb, sheet([
     ["버섯사업 4개년 손익계획", "", "", "", "", ""],
-    ["단위: 원", `영업이익률 ${n(S.margin)}%`],
+    ["단위: 원"],
     [],
     ["구분", ...y, "4년 합계"],
-    ["배지 매출", ...r.medium, r.sum.medium],
-    ["버섯 매출", ...r.mushroom, r.sum.mushroom],
-    ["모듈러 매출", ...r.modular, r.sum.modular],
-    ["매출 합계", ...r.total, r.sum.total],
-    [`영업이익 (${n(S.margin)}%)`, ...r.profit, r.sum.profit],
+    ...COLS.map(c => [`${c.name} 매출`, ...R.Y.map(v => v.rev[c.key]), sumY(v => v.rev[c.key])]),
+    ["매출 합계", ...R.Y.map(v => v.rev.total), sumY(v => v.rev.total)],
+    ["매출원가", ...R.Y.map(v => v.cogs.total), sumY(v => v.cogs.total)],
+    ["매출이익", ...R.Y.map(v => v.gross.total), sumY(v => v.gross.total)],
+    ["매출이익률", ...R.Y.map(v => v.gross.total / v.rev.total), sumY(v => v.gross.total) / sumY(v => v.rev.total)],
+    ["판매관리비", ...R.Y.map(v => v.sga.total), sumY(v => v.sga.total)],
+    ["영업이익", ...R.Y.map(v => v.op.total), sumY(v => v.op.total)],
+    ["영업이익률", ...R.Y.map(v => v.op.total / v.rev.total), sumY(v => v.op.total) / sumY(v => v.rev.total)],
     [],
-    ["배지 기말재고 (개)", ...r.inv.map(x => x.close)],
-    ["배지 소비량 (개)", ...r.use],
-    ["버섯 자체 생산량 (kg)", ...r.kg],
-    ["버섯 수매량 (kg)", ...r.buyKg],
-    ["버섯 판매량 (kg)", ...r.sellKg],
-    ["버섯 판매량 (톤)", ...r.sellKg.map(v => v / 1000)],
-    ["버섯 수매 금액 (원, 참고)", ...r.buyCost, sumArr(r.buyCost)],
-    [],
-    ["투자비", ...r.inv_y, r.investTotal],
-  ], [22, 16, 16, 16, 16, 18]), "손익요약");
+    ["버섯 생산량 (kg)", ...R.Y.map(v => v.kgSelf + v.kgMod), sumY(v => v.kgSelf + v.kgMod)],
+    ["배지 기말재고 (개)", ...R.Y.map(v => v.inv.close)],
+    ["투자비", ...R.invY, R.investTotal],
+  ], [22, 18, 18, 18, 18, 20]), "손익요약");
 
-  XLSX.utils.book_append_sheet(wb, sheet([
-    ["구분", "항목", "단위", ...y],
-    ["배지", "단가", "원/개", ...S.medium.price.map(n)],
-    ["배지", "판매량", "개", ...S.medium.sales.map(n)],
-    ["배지", "매출", "원", ...r.medium],
-    ["버섯", "도매 판매가격", "원/kg", ...S.mushroom.price.map(n)],
-    ["버섯", "자체 생산량", "kg", ...r.kg],
-    ["버섯", "수매량", "kg", ...r.buyKg],
-    ["버섯", "판매량", "kg", ...r.sellKg],
-    ["버섯", "매출", "원", ...r.mushroom],
-    ["모듈러", "단가", "원/대", ...S.modular.price.map(n)],
-    ["모듈러", "판매량", "대", ...S.modular.sales.map(n)],
-    ["모듈러", "누적 판매", "대", ...r.modCum],
-    ["모듈러", "매출", "원", ...r.modular],
-  ], [10, 10, 8, 16, 16, 16, 16]), "매출입력");
+  // 연도별 상세: 원본 엑셀과 같은 배치로 4개 연도 블록
+  const blocks = [];
+  R.Y.forEach((v, i) => {
+    const pct = r => (isFinite(r) ? r : "");
+    blocks.push(
+      [`${years()[i]}년(${i + 1}년차)`],
+      ["구분", "", "단위", ...COLS.map(c => c.name), "합계"],
+      ["", "생산동수", "", v.self, v.mod, v.mod, "", ""],
+      ["", "신규증가", "", v.newSelf, v.newMod, v.newMod, v.newMod, ""],
+      ["", "대당배지입상수 1회", "개", FIX.selfPer, FIX.modPer, FIX.modPer, "", ""],
+      ["", "년간 회전수(20일)", "회", FIX.turns, FIX.turns, FIX.turns, "", ""],
+      ["버섯", "배지당 수확량", "kg", v.yk, v.yk, "", "", ""],
+      ["", "배지 투입수(판매수)", "개", v.inSelf, v.inMod, v.inMod, "", v.inSelf + 2 * v.inMod],
+      ["버섯", "생산량", "kg", v.kgSelf, v.kgMod, "", "", v.kgSelf + v.kgMod],
+      ["", "톤환산", "t", v.kgSelf / 1000, v.kgMod / 1000, "", "", (v.kgSelf + v.kgMod) / 1000],
+      ["배지", "배지판매단가-개당", "원", "", "", n(S.price.medium[i]), "", ""],
+      ["버섯", "수매단가-kg당", "원", "", n(S.price.buy[i]), "", "", ""],
+      ["버섯", "판매단가-kg당", "원", n(S.price.mush[i]), n(S.price.mush[i]), "", n(S.price.modular[i]), ""],
+      ["", "매출원가율", "", ...COLS.map(c => v.cr[c.key]), ""],
+      ["총매출", "년간예상매출", "원", ...COLS.map(c => v.rev[c.key]), v.rev.total],
+      ["원가", "매출원가", "원", ...COLS.map(c => v.cogs[c.key]), v.cogs.total],
+      ["매출이익", "", "원", ...COLS.map(c => v.gross[c.key]), v.gross.total],
+      ["매출이익률", "", "", ...COLS.map(c => pct(v.gross[c.key] / v.rev[c.key])), pct(v.gross.total / v.rev.total)],
+      ["판관비", `판관비율 ${n(S.sga[i])}%`, "원", ...COLS.map(c => v.sga[c.key]), v.sga.total],
+      ["영업이익", "", "원", ...COLS.map(c => v.op[c.key]), v.op.total],
+      ["영업이익률", "", "", ...COLS.map(c => pct(v.op[c.key] / v.rev[c.key])), pct(v.op.total / v.rev.total)],
+      [],
+    );
+  });
+  XLSX.utils.book_append_sheet(wb, sheet(blocks, [10, 20, 6, 18, 18, 18, 18, 20]), "연도별상세");
 
   XLSX.utils.book_append_sheet(wb, sheet([
     ["항목 (개)", ...y],
-    ["기초재고", ...r.inv.map(x => x.open)],
+    ["기초재고", ...R.Y.map(v => v.inv.open)],
     ["생산량", ...S.medium.prod.map(n)],
-    ["판매량", ...S.medium.sales.map(n)],
-    [S.deduct ? "시설 소비량" : "시설 소비량 (차감 안 함)", ...r.use],
-    ["기말재고", ...r.inv.map(x => x.close)],
-  ], [14, 14, 14, 14, 14]), "배지재고");
-
-  XLSX.utils.book_append_sheet(wb, sheet([
-    ["모델", "대당 연간 배지 소비 (개)", ...y.map(v => `${v} 대수`), ...y.map(v => `${v} 배지 소비량`)],
-    ...MODELS.map(m => [m.name, m.cap, ...S.fac[m.key].map(n), ...S.fac[m.key].map(v => n(v) * m.cap)]),
-    ["배지 소비량 합계", "", "", "", "", "", ...r.use],
-    ["배지당 수확량 (kg)", "", "", "", "", "", ...S.mushroom.yieldKg.map(n)],
-    ["자체 생산량 (kg)", "", "", "", "", "", ...r.kg],
-  ], [18, 20, 11, 11, 11, 11, 16, 16, 16, 16]), "생산시설");
-
-  XLSX.utils.book_append_sheet(wb, sheet([
-    ["항목", "단위", ...y],
-    ["배지당 수확량", "kg", ...S.mushroom.yieldKg.map(n)],
-    ["수매 가격", "원/kg", ...S.mushroom.buyPrice.map(n)],
-    [S.modCum ? "수매 대상 모듈러 (누적)" : "수매 대상 모듈러 (당해 판매분)", "대", ...r.modCum],
-    ["모듈러 배지 소비량", "개", ...r.buyUse],
-    ["수매량", "kg", ...r.buyKg],
-    ["수매 금액", "원", ...r.buyCost],
-  ], [24, 8, 16, 16, 16, 16]), "버섯수매");
+    ["자체 생산 투입", ...R.Y.map(v => v.inSelf)],
+    ["모둘러 공급 (배지 판매)", ...R.Y.map(v => v.inMod)],
+    ["기말재고", ...R.Y.map(v => v.inv.close)],
+  ], [24, 14, 14, 14, 14]), "배지재고");
 
   const I = S.invest;
   XLSX.utils.book_append_sheet(wb, sheet([
     ["항목", "단위", ...y, "합계"],
     ["투자 내용", "", ...I.label.map(String), ""],
-    ["부지 면적", "평", ...I.landArea.map(n), r.landArea],
-    ["부지 면적", "㎡", ...I.landArea.map(v => +(n(v) * PYEONG_M2).toFixed(1)), +(r.landArea * PYEONG_M2).toFixed(1)],
+    ["부지 면적", "평", ...I.landArea.map(n), R.landArea],
+    ["부지 면적", "㎡", ...I.landArea.map(v => +(n(v) * PYEONG_M2).toFixed(1)), +(R.landArea * PYEONG_M2).toFixed(1)],
     ["부지 평당 단가", "원", ...I.landPrice.map(n), ""],
-    ["부지 비용", "원", ...r.land, r.land.reduce((a, b) => a + b, 0)],
-    ["건축 면적", "평", ...I.bldgArea.map(n), r.bldgArea],
-    ["건축 면적", "㎡", ...I.bldgArea.map(v => +(n(v) * PYEONG_M2).toFixed(1)), +(r.bldgArea * PYEONG_M2).toFixed(1)],
+    ["부지 비용", "원", ...R.land, sumArr(R.land)],
+    ["건축 면적", "평", ...I.bldgArea.map(n), R.bldgArea],
+    ["건축 면적", "㎡", ...I.bldgArea.map(v => +(n(v) * PYEONG_M2).toFixed(1)), +(R.bldgArea * PYEONG_M2).toFixed(1)],
     ["건축 평당 단가", "원", ...I.bldgPrice.map(n), ""],
-    ["건축 비용", "원", ...r.bldg, r.bldg.reduce((a, b) => a + b, 0)],
-    ["연간 투자비", "원", ...r.inv_y, r.investTotal],
-    ["누적 투자비", "원", ...r.inv_cum, ""],
+    ["건축 비용", "원", ...R.bldg, sumArr(R.bldg)],
+    ["연간 투자비", "원", ...R.invY, R.investTotal],
+    ["누적 투자비", "원", ...R.invCum, ""],
   ], [16, 6, 18, 18, 18, 18, 18]), "투자비");
 
   return wb;
@@ -586,15 +614,18 @@ $("xlsxBtn").addEventListener("click", e =>
 // ---- 연도별 입력 업로드 ----
 // 양식의 각 행: 구분 | 항목 | 단위 | 1년차 | 2년차 | 3년차 | 4년차 | 코드(수정 금지)
 const YEAR_ROWS = [
-  ["배지", "단가", "원/개", "medium.price"],
-  ["배지", "판매량", "개", "medium.sales"],
+  ["생산동수", "자체 생산", "동", "dong.self"],
+  ["생산동수", "모둘러", "대", "dong.mod"],
+  ["버섯", "배지당 수확량", "kg", "yieldKg"],
+  ["버섯", "판매단가", "원/kg", "price.mush"],
+  ["버섯", "수매단가", "원/kg", "price.buy"],
+  ["배지", "판매단가", "원/개", "price.medium"],
+  ["모둘러", "판매단가", "원/대", "price.modular"],
+  ["매출원가율", "자체 생산", "%", "cost.self"],
+  ["매출원가율", "배지 매출", "%", "cost.medium"],
+  ["매출원가율", "모둘러 판매", "%", "cost.modSale"],
+  ["판매관리비율", "판관비율", "%", "sga"],
   ["배지", "생산량", "개", "medium.prod"],
-  ["버섯", "도매 판매가격", "원/kg", "mushroom.price"],
-  ["버섯", "수매 가격", "원/kg", "mushroom.buyPrice"],
-  ["버섯", "배지당 수확량", "kg", "mushroom.yieldKg"],
-  ["모듈러", "단가", "원/대", "modular.price"],
-  ["모듈러", "판매량", "대", "modular.sales"],
-  ...MODELS.map(m => ["생산시설", `${m.name} 대수`, "대", `fac.${m.key}`]),
   ["투자", "투자 내용", "글자", "invest.label"],
   ["투자", "부지 면적", "평", "invest.landArea"],
   ["투자", "부지 평당 단가", "원", "invest.landPrice"],
@@ -607,7 +638,7 @@ function buildTemplate() {
   const rows = [["구분", "항목", "단위", ...years().map(y => `${y}년`), "코드(수정 금지)"],
     ...YEAR_ROWS.map(([g, item, unit, key]) => [g, item, unit, ...get(key).map(v => key === "invest.label" ? String(v) : n(v)), key])];
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [10, 18, 8, 16, 16, 16, 16, 18].map(w => ({ wch: w }));
+  ws["!cols"] = [12, 16, 8, 16, 16, 16, 16, 18].map(w => ({ wch: w }));
   for (const ref in ws) if (ref[0] !== "!" && typeof ws[ref].v === "number") ws[ref].z = "#,##0.##";
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, TEMPLATE_SHEET);
@@ -618,7 +649,7 @@ $("tplBtn").addEventListener("click", e => saveXlsx(buildTemplate(), "버섯사�
 const toNum = v => {
   if (v === undefined || v === null || v === "") return 0;
   if (typeof v === "number") return v;
-  const x = Number(String(v).replace(/[,\s원개평대kg]/g, ""));
+  const x = Number(String(v).replace(/[,\s원개평대동kg%]/g, ""));
   return isFinite(x) ? x : NaN;
 };
 function applyUpload(wb) {
