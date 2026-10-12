@@ -64,6 +64,8 @@ tr.group td { padding-top: 14px; font-weight: 700; border-bottom: none; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); }
 tr.calc td { color: var(--muted); }
 tr.profit td { font-weight: 700; color: var(--accent); }
+tr.basis td { font-family: var(--font-num); font-size: 11px; line-height: 1.5; color: var(--muted); background: var(--input-bg); vertical-align: top; }
+tr.basis td:first-child { font-family: var(--font-body); font-size: 12px; }
 .unit { color: var(--muted); font-size: 12px; margin-left: 4px; }
 input, select { font: inherit; font-family: var(--font-num); color: var(--fg); background: var(--input-bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
 td input { width: 130px; text-align: right; }
@@ -335,6 +337,18 @@ function buildInputs() {
   $("unitSel").value = String(S.unit);
 }
 
+// 배지 투입수 산출 근거: 신규×입상수×회전수×0.5 + 기존×입상수×회전수
+function basisParts(nw, total, per) {
+  const old = total - nw;
+  return {
+    newText: `신규 ${fmtInt(nw)} × ${fmtInt(per)} × ${FIX.turns} × ${FIX.firstYear} = ${fmtInt(nw * per * FIX.turns * FIX.firstYear)}`,
+    oldText: `기존 ${fmtInt(old)} × ${fmtInt(per)} × ${FIX.turns} = ${fmtInt(old * per * FIX.turns)}`,
+  };
+}
+function basisHtml(nw, total, per, unit) {
+  const b = basisParts(nw, total, per);
+  return `${b.newText}<br>+ ${b.oldText}<br><span class="unit">(${unit}수 × 1회 입상수 × 연간 회전수)</span>`;
+}
 function renderDetail(R) {
   const y = R.Y[detailYear];
   const c = v => `<td class="num">${v}</td>`;
@@ -351,6 +365,9 @@ function renderDetail(R) {
     tr("연간 회전수 (20일)", "회", f(FIX.turns) + f(FIX.turns) + f(FIX.turns) + e + e) +
     tr("배지당 수확량", "kg", c(y.yk) + c(y.yk) + e + e + e) +
     tr("배지 투입수 (판매수)", "개", c(fmtInt(y.inSelf)) + c(fmtInt(y.inMod)) + c(fmtInt(y.inMod)) + e + c(fmtInt(y.inSelf + 2 * y.inMod))) +
+    `<tr class="basis"><td>산출 근거<span class="unit">신규는 첫해 ${FIX.firstYear * 100}%</span></td>` +
+      `<td>${basisHtml(y.newSelf, y.self, FIX.selfPer, "동")}</td><td>${basisHtml(y.newMod, y.mod, FIX.modPer, "대")}</td>` +
+      `<td>모둘러 투입수와 같음<br>(모둘러에 배지 판매)</td><td></td><td>자체 + 모둘러 + 배지매출 열의 합<br>(엑셀 합계와 같은 방식)</td></tr>` +
     tr("버섯 생산량", "kg", c(fmtInt(y.kgSelf)) + c(fmtInt(y.kgMod)) + e + e + c(fmtInt(y.kgSelf + y.kgMod)), "profit") +
     tr("톤 환산", "t", c(fmtTon(y.kgSelf)) + c(fmtTon(y.kgMod)) + e + e + c(fmtTon(y.kgSelf + y.kgMod))) +
     tr("배지 판매단가", "원/개", e + e + c(fmtInt(S.price.medium[detailYear])) + e + e) +
@@ -543,6 +560,8 @@ function buildWorkbook() {
       ["", "년간 회전수(20일)", "회", FIX.turns, FIX.turns, FIX.turns, "", ""],
       ["버섯", "배지당 수확량", "kg", v.yk, v.yk, "", "", ""],
       ["", "배지 투입수(판매수)", "개", v.inSelf, v.inMod, v.inMod, "", v.inSelf + 2 * v.inMod],
+      ["", "  산출 근거(신규)", "", basisParts(v.newSelf, v.self, FIX.selfPer).newText, basisParts(v.newMod, v.mod, FIX.modPer).newText, "모둘러 투입수와 같음", "", ""],
+      ["", "  산출 근거(기존)", "", basisParts(v.newSelf, v.self, FIX.selfPer).oldText, basisParts(v.newMod, v.mod, FIX.modPer).oldText, "", "", ""],
       ["버섯", "생산량", "kg", v.kgSelf, v.kgMod, "", "", v.kgSelf + v.kgMod],
       ["", "톤환산", "t", v.kgSelf / 1000, v.kgMod / 1000, "", "", (v.kgSelf + v.kgMod) / 1000],
       ["배지", "배지판매단가-개당", "원", "", "", n(S.price.medium[i]), "", ""],
