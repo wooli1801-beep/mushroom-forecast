@@ -22,7 +22,10 @@
   --c-mod: #4c6a8c;       /* 모둘러 판매 */
   --c-gross: #8a948e;     /* 매출이익 선 */
   --c-profit: #1d2420;    /* 영업이익 선 */
-  --input-bg: #f8f9f6;
+  --input-bg: #fff4c2;    /* 입력칸: 엑셀 '입력' 노란색 계열 */
+  --input-line: #cfa93a;
+  --input-fg: #3a2f00;
+  --row-alt: #f6f7f4;
   --warn: #b3412e;
   --warn-bg: #fbeae6;
   --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -32,13 +35,13 @@
   :root:not([data-theme="light"]) {
     --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
     --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #e6ebe7;
-    --input-bg: #232b26; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
+    --input-bg: #3b3418; --input-line: #9c8433; --input-fg: #fbefc0; --row-alt: #222a25; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
   --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #e6ebe7;
-  --input-bg: #232b26; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
+  --input-bg: #3b3418; --input-line: #9c8433; --input-fg: #fbefc0; --row-alt: #222a25; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.55; margin: 0; }
@@ -64,10 +67,12 @@ tr.group td { padding-top: 14px; font-weight: 700; border-bottom: none; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); }
 tr.calc td { color: var(--muted); }
 tr.profit td { font-weight: 700; color: var(--accent); }
-tr.basis td { font-family: var(--font-num); font-size: 11px; line-height: 1.5; color: var(--muted); background: var(--input-bg); vertical-align: top; }
+tr.basis td { font-family: var(--font-num); font-size: 11px; line-height: 1.5; color: var(--muted); background: var(--row-alt); vertical-align: top; }
 tr.basis td:first-child { font-family: var(--font-body); font-size: 12px; }
 .unit { color: var(--muted); font-size: 12px; margin-left: 4px; }
-input, select { font: inherit; font-family: var(--font-num); color: var(--fg); background: var(--input-bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
+input, select { font: inherit; font-family: var(--font-num); color: var(--input-fg); background: var(--input-bg); border: 1px solid var(--input-line); border-radius: 4px; padding: 4px 6px; font-weight: 500; }
+input:hover { border-color: var(--fg); }
+.inchip { display: inline-block; background: var(--input-bg); border: 1px solid var(--input-line); color: var(--input-fg); border-radius: 3px; padding: 0 6px; font-weight: 500; }
 td input { width: 130px; text-align: right; }
 td input.txt { width: 150px; text-align: left; font-family: var(--font-body); }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -118,7 +123,7 @@ button:disabled { opacity: 0.6; cursor: default; }
   </header>
 
   <p class="toast" id="toast" role="status"></p>
-  <p class="example">입력칸에는 "듀엘 매출액 예상.xlsx"의 숫자가 기본값으로 들어 있습니다. 입력값은 이 브라우저에 자동 저장됩니다.</p>
+  <p class="example"><span class="inchip">노란 칸</span>이 입력칸입니다. 나머지는 자동 계산됩니다. 입력칸에는 "듀엘 매출액 예상.xlsx"의 숫자가 기본값으로 들어 있습니다. 입력값은 이 브라우저에 자동 저장됩니다.</p>
 
   <div class="kpis" id="kpis"></div>
 
@@ -128,7 +133,11 @@ button:disabled { opacity: 0.6; cursor: default; }
   </section>
 
   <section>
-    <h2>매출 · 이익 추이</h2>
+    <h2>매출 · 이익 추이 <small>단위: 억원</small></h2>
+    <div class="tabs" id="chartMode" role="group" aria-label="그래프 보기 방식">
+      <button type="button" data-mode="amount" aria-pressed="true">금액 (억원)</button>
+      <button type="button" data-mode="share" aria-pressed="false">매출 구성비 (%)</button>
+    </div>
     <div class="panel"><div class="chart-box"><canvas id="chart" aria-label="연도별 매출, 매출이익, 영업이익 그래프"></canvas></div></div>
   </section>
 
@@ -145,7 +154,7 @@ button:disabled { opacity: 0.6; cursor: default; }
   </section>
 
   <section>
-    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 자체 생산 투입 − 모둘러 공급(배지 판매)</small></h2>
+    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 자체 생산 투입 − 모둘러 공급(배지 판매) · 기말재고는 다음 해 기초재고로 이월</small></h2>
     <div class="panel tbl-wrap"><table id="mediumTbl"></table></div>
     <div class="row"><button id="fillMedium" type="button">생산량을 필요량으로 채우기</button></div>
   </section>
@@ -307,11 +316,11 @@ function buildInputs() {
   $("yearTabs").innerHTML = years().map((y, i) => `<button type="button" data-year="${i}" aria-pressed="${i === detailYear}">${y}년 (${i + 1}년차)</button>`).join("");
 
   $("mediumTbl").innerHTML = yearHead("항목") + "<tbody>" +
-    `<tr><td>기초재고<span class="unit">개</span></td><td>${inp("medium.opening")}</td>${[1,2,3].map(i => `<td class="num" id="c-open-${i}"></td>`).join("")}</tr>` +
+    `<tr><td>기초재고<span class="unit">개 · 2년차부터 전년 기말재고</span></td><td>${inp("medium.opening")}</td>${[1,2,3].map(i => `<td class="num" id="c-open-${i}"></td>`).join("")}</tr>` +
     row("생산량", "개", "medium.prod") +
     crow("자체 생산 투입", "개", "c-inself") +
     crow("모둘러 공급 (배지 판매)", "개", "c-inmod") +
-    `<tr class="total"><td>기말재고<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-close-${i}"></td>`).join("")}</tr>` +
+    `<tr class="total"><td>기말재고 (외부 판매가능수)<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-close-${i}"></td>`).join("")}</tr>` +
     "</tbody>";
 
   const ir = (label, unit, cells, cls = "") => `<tr class="${cls}"><td>${label}<span class="unit">${unit}</span></td>${cells}</tr>`;
@@ -427,7 +436,7 @@ function update() {
     line("영업이익", y => y.op.total, "profit") +
     rate("영업이익률", y => y.op.total, y => y.rev.total) +
     qty("버섯 생산량 (톤 · 자체+모둘러)", y => y.kgSelf + y.kgMod, fmtTon) +
-    `<tr class="calc"><td>배지 기말재고 (개)</td>${R.Y.map(y => `<td class="num">${fmtInt(y.inv.close)}</td>`).join("")}<td></td></tr>` +
+    `<tr class="calc"><td>배지 기말재고 (외부 판매가능수, 개)</td>${R.Y.map(y => `<td class="num">${fmtInt(y.inv.close)}</td>`).join("")}<td></td></tr>` +
     `<tr class="calc"><td>투자비</td>${R.invY.map(v => `<td class="num">${money(v)}</td>`).join("")}<td class="num">${money(R.investTotal)}</td></tr>` +
     "</tbody>";
   $("unitLabel").textContent = `단위: ${unitName()}`;
@@ -445,43 +454,98 @@ function update() {
 }
 
 let chart;
+let chartMode = "amount"; // amount: 금액(억원) / share: 매출 구성비(%)
+const EOK = 100000000;
+const fmtEok = v => (v / EOK).toLocaleString("ko-KR", { maximumFractionDigits: 1 }) + "억";
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// 막대 위·안쪽, 이익 선 옆에 억원 금액 표시
+const valueLabels = {
+  id: "valueLabels",
+  afterDatasetsDraw(ch) {
+    const L = ch.$labels; if (!L) return;
+    const { ctx } = ch;
+    const barIdx = ch.data.datasets.map((d, i) => d.type === "bar" ? i : -1).filter(i => i >= 0);
+    ctx.save();
+    L.total.forEach((tot, i) => {
+      const first = ch.getDatasetMeta(barIdx[0]).data[i];
+      const x = first.x;
+      ctx.textAlign = "center";
+      if (L.mode === "amount") {
+        const top = Math.min(...barIdx.map(k => ch.getDatasetMeta(k).data[i].y));
+        ctx.font = "700 12px 'IBM Plex Mono', monospace";
+        ctx.fillStyle = L.fg; ctx.textBaseline = "bottom";
+        ctx.fillText(fmtEok(tot), x, top - 4);
+      } else {
+        barIdx.forEach(k => {
+          const el = ch.getDatasetMeta(k).data[i], pct = ch.data.datasets[k].data[i];
+          if (pct < 6) return;
+          ctx.font = "500 11px 'IBM Plex Mono', monospace";
+          ctx.fillStyle = "#ffffff"; ctx.textBaseline = "middle";
+          ctx.fillText(`${pct.toFixed(1)}%`, el.x, (el.y + el.base) / 2);
+        });
+        ctx.font = "700 12px 'IBM Plex Mono', monospace";
+        ctx.fillStyle = L.fg; ctx.textBaseline = "bottom";
+        ctx.fillText(`합계 ${fmtEok(tot)}`, x, ch.scales.y.getPixelForValue(100) - 4);
+      }
+    });
+    ctx.restore();
+  },
+};
+
 function drawChart(R) {
   if (typeof Chart === "undefined") return;
-  const d = f => R.Y.map(y => +(f(y) / S.unit).toFixed(2));
-  const labels = years().map(y => `${y}년`);
-  const ds = [
-    ...COLS.map(c => ({ type: "bar", label: `${c.name} 매출`, data: d(y => y.rev[c.key]), backgroundColor: css(c.color), stack: "s", order: 3 })),
-    { type: "line", label: "매출이익", data: d(y => y.gross.total), borderColor: css("--c-gross"), backgroundColor: css("--c-gross"), borderDash: [6, 4], borderWidth: 2, pointRadius: 3, tension: 0.2, order: 2 },
-    { type: "line", label: "영업이익", data: d(y => y.op.total), borderColor: css("--c-profit"), backgroundColor: css("--c-profit"), borderWidth: 2, pointRadius: 4, tension: 0.2, order: 1 },
-  ];
+  const share = chartMode === "share";
+  // 연도 아래에 이익 금액 (판관비가 있으면 영업이익도)
+  const labels = years().map((yr, i) => {
+    const y = R.Y[i], lines = [`${yr}년`];
+    if (!share) {
+      lines.push(`매출이익 ${fmtEok(y.gross.total)}`);
+      if (Math.abs(y.op.total - y.gross.total) >= 1) lines.push(`영업이익 ${fmtEok(y.op.total)}`);
+    }
+    return lines;
+  });
+  const val = (y, v) => share ? (y.rev.total ? v / y.rev.total * 100 : 0) : v / EOK;
+  const bar = { type: "bar", stack: "s", order: 3, barPercentage: 0.55, categoryPercentage: 0.7, maxBarThickness: 64 };
+  const ds = COLS.map(c => ({ ...bar, label: `${c.name} 매출`, backgroundColor: css(c.color), data: R.Y.map(y => +val(y, y.rev[c.key]).toFixed(2)) }));
+  if (!share) ds.push(
+    { type: "line", stack: "g", label: "매출이익", data: R.Y.map(y => +(y.gross.total / EOK).toFixed(2)), borderColor: css("--c-gross"), backgroundColor: css("--c-gross"), borderDash: [6, 4], borderWidth: 2, pointRadius: 3, tension: 0.2, order: 2 },
+    { type: "line", stack: "o", label: "영업이익", data: R.Y.map(y => +(y.op.total / EOK).toFixed(2)), borderColor: css("--c-profit"), backgroundColor: css("--c-profit"), borderWidth: 2, pointRadius: 4, tension: 0.2, order: 1 },
+  );
   const fg = css("--muted"), grid = css("--line");
-  if (chart) {
-    chart.data.labels = labels;
-    chart.data.datasets.forEach((x, i) => { x.data = ds[i].data; x.backgroundColor = ds[i].backgroundColor; x.borderColor = ds[i].borderColor; });
-    chart.options.scales.y.title.text = unitName();
-    chart.options.scales.x.ticks.color = chart.options.scales.y.ticks.color = chart.options.plugins.legend.labels.color = fg;
-    chart.options.scales.y.grid.color = grid;
-    chart.update("none");
-    return;
-  }
+  if (chart) chart.destroy();
   chart = new Chart($("chart"), {
     data: { labels, datasets: ds },
+    plugins: [valueLabels],
     options: {
       maintainAspectRatio: false, animation: false,
+      layout: { padding: { top: 24, right: 8 } },
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { position: "bottom", labels: { color: fg, boxWidth: 12, font: { family: "IBM Plex Sans KR" } } },
-        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toLocaleString("ko-KR")} ${unitName()}` } },
+        tooltip: { callbacks: { label: c => share
+          ? `${c.dataset.label}: ${c.parsed.y.toFixed(1)}% (${fmtEok(R.Y[c.dataIndex].rev[COLS[c.datasetIndex].key])})`
+          : `${c.dataset.label}: ${c.parsed.y.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}억` } },
       },
       scales: {
         x: { stacked: true, grid: { display: false }, ticks: { color: fg } },
-        y: { stacked: true, beginAtZero: true, grid: { color: grid }, ticks: { color: fg, callback: v => v.toLocaleString("ko-KR") },
-             title: { display: true, text: unitName(), color: fg } },
+        y: { stacked: true, beginAtZero: true, max: share ? 100 : undefined, grid: { color: grid },
+             ticks: { color: fg, callback: v => v.toLocaleString("ko-KR") + (share ? "%" : "") },
+             title: { display: true, text: share ? "매출 구성비 (%)" : "억원", color: fg } },
       },
     },
   });
+  chart.$labels = { mode: chartMode, total: R.Y.map(y => y.rev.total), gross: R.Y.map(y => y.gross.total), op: R.Y.map(y => y.op.total),
+    grossIdx: COLS.length, opIdx: COLS.length + 1, fg: css("--fg"), grossColor: css("--c-gross"), opColor: css("--c-profit") };
+  chart.draw();
 }
+$("chartMode").addEventListener("click", e => {
+  const b = e.target.closest("button[data-mode]");
+  if (!b) return;
+  chartMode = b.dataset.mode;
+  [...$("chartMode").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  drawChart(calc());
+});
 
 document.addEventListener("input", e => {
   const p = e.target.dataset && e.target.dataset.path;
@@ -543,7 +607,7 @@ function buildWorkbook() {
     ["영업이익률", ...R.Y.map(v => v.op.total / v.rev.total), sumY(v => v.op.total) / sumY(v => v.rev.total)],
     [],
     ["버섯 생산량 (kg)", ...R.Y.map(v => v.kgSelf + v.kgMod), sumY(v => v.kgSelf + v.kgMod)],
-    ["배지 기말재고 (개)", ...R.Y.map(v => v.inv.close)],
+    ["배지 기말재고 (외부 판매가능수, 개)", ...R.Y.map(v => v.inv.close)],
     ["투자비", ...R.invY, R.investTotal],
   ], [22, 18, 18, 18, 18, 20]), "손익요약");
 
@@ -582,11 +646,11 @@ function buildWorkbook() {
 
   XLSX.utils.book_append_sheet(wb, sheet([
     ["항목 (개)", ...y],
-    ["기초재고", ...R.Y.map(v => v.inv.open)],
+    ["기초재고 (전년 기말재고 이월)", ...R.Y.map(v => v.inv.open)],
     ["생산량", ...S.medium.prod.map(n)],
     ["자체 생산 투입", ...R.Y.map(v => v.inSelf)],
     ["모둘러 공급 (배지 판매)", ...R.Y.map(v => v.inMod)],
-    ["기말재고", ...R.Y.map(v => v.inv.close)],
+    ["기말재고 (외부 판매가능수)", ...R.Y.map(v => v.inv.close)],
   ], [24, 14, 14, 14, 14]), "배지재고");
 
   const I = S.invest;
