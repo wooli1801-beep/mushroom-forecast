@@ -101,12 +101,14 @@ button:disabled { opacity: 0.6; cursor: default; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .fac-plan { display: grid; gap: 8px; }
 .fac-head { justify-content: space-between; }
-.fac-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-.fac-box { background: var(--surface); border: 1px solid var(--fg); border-radius: 6px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
-.fac-box h3 { margin: 0; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fac-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+/* 연도별 박스 한 줄: 연도·재고 | 자체생산 | 위탁생산 */
+.fac-box { background: var(--surface); border: 1px solid var(--fg); border-radius: 6px; padding: 12px 16px; display: grid; grid-template-columns: 170px 1fr 1fr; gap: 16px; align-items: center; min-width: 0; }
+.fac-box h3 { margin: 0; font-size: 15px; display: grid; gap: 2px; }
 .fac-box h3 span { font-family: var(--font-num); font-weight: 500; color: var(--muted); font-size: 12px; }
-.fac-box ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
-.fac-box b { font-family: var(--font-num); color: var(--accent); }
+.fac-item { display: grid; gap: 2px; min-width: 0; }
+.fac-item b { font-family: var(--font-num); color: var(--accent); font-size: 15px; }
+@media (max-width: 700px) { .fac-box { grid-template-columns: 1fr; gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
@@ -308,14 +310,16 @@ function renderFacilityPlan(R) {
   const boxes = R.Y.map((y, i) => {
     const p = y.plan, yr = years()[i];
     if (!p) return "";
-    return `<div class="fac-box"><h3>${yr}년 <span>기말재고 ${fmtInt(p.stock)}개</span></h3>
-      <p class="note">재고 소비를 위해 (자체 ${share} : 위탁 ${100 - share})</p>
-      <ul>
-        <li>자체생산(버섯) 시설 (동당 1회 ${fmtInt(FIX.selfPer)}개 기준) <b>${fmtInt(p.selfUnits)}동</b> 증축
-          <br><span class="unit">배지 ${fmtInt(p.selfQty)}개 ÷ ${fmtInt(p.selfYear)}개/동 · 현재 ${fmtInt(y.self)}동 → ${fmtInt(y.self + p.selfUnits)}동</span></li>
-        <li>위탁생산버섯(모듈러) (대당 1회 ${fmtInt(FIX.modPer)}개 기준) <b>${fmtInt(p.modUnits)}대</b> 필요
-          <br><span class="unit">배지 ${fmtInt(p.modQty)}개 ÷ ${fmtInt(p.modYear)}개/대 · 현재 ${fmtInt(y.mod)}대 → ${fmtInt(y.mod + p.modUnits)}대</span></li>
-      </ul></div>`;
+    return `<div class="fac-box">
+      <h3>${yr}년<span>기말재고 ${fmtInt(p.stock)}개</span><span>재고 소비 (자체 ${share} : 위탁 ${100 - share})</span></h3>
+      <div class="fac-item">
+        <div>자체생산(버섯) 시설 (동당 1회 ${fmtInt(FIX.selfPer)}개 기준) <b>${fmtInt(p.selfUnits)}동</b> 증축</div>
+        <span class="unit">배지 ${fmtInt(p.selfQty)}개 ÷ ${fmtInt(p.selfYear)}개/동 · 현재 ${fmtInt(y.self)}동 → ${fmtInt(y.self + p.selfUnits)}동</span>
+      </div>
+      <div class="fac-item">
+        <div>위탁생산버섯(모듈러) (대당 1회 ${fmtInt(FIX.modPer)}개 기준) <b>${fmtInt(p.modUnits)}대</b> 필요</div>
+        <span class="unit">배지 ${fmtInt(p.modQty)}개 ÷ ${fmtInt(p.modYear)}개/대 · 현재 ${fmtInt(y.mod)}대 → ${fmtInt(y.mod + p.modUnits)}대</span>
+      </div></div>`;
   }).join("");
   $("facBoxes").innerHTML = boxes || `<p class="note">모든 연도의 기말재고가 ${fmtInt(STOCK_THRESHOLD)}개 이하라 추가 시설이 필요하지 않습니다.</p>`;
 }
