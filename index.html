@@ -15,7 +15,7 @@
   --c-med: #8c7b4a;       /* 배지 매출 */
   --c-mod: #4c6a8c;       /* 모듈러 판매 */
   --c-gross: #8a948e;     /* 매출이익 선 */
-  --c-profit: #1d2420;    /* 영업이익 선 */
+  --c-profit: #ff5c8a;    /* 영업이익 추세선: 밝은 분홍 */
   --input-bg: #fff4c2;    /* 입력칸: 엑셀 '입력' 노란색 계열 */
   --input-line: #cfa93a;
   --input-fg: #3a2f00;
@@ -28,13 +28,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
-    --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #e6ebe7;
+    --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #ff8fb0;
     --input-bg: #3b3418; --input-line: #9c8433; --input-fg: #fbefc0; --row-alt: #222a25; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
-  --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #e6ebe7;
+  --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #ff8fb0;
   --input-bg: #3b3418; --input-line: #9c8433; --input-fg: #fbefc0; --row-alt: #222a25; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -82,7 +82,17 @@ button:disabled { opacity: 0.6; cursor: default; }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
 .kpi .k { font-size: 12px; color: var(--muted); letter-spacing: 0.02em; }
 .kpi .v { font-family: var(--font-num); font-size: 20px; font-weight: 500; }
-.chart-box { position: relative; height: 340px; }
+.chart-box { position: relative; height: 420px; }
+.chart-wrap { position: relative; }
+.chart-table { position: absolute; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; pointer-events: none; }
+.chart-table table { min-width: 0; width: auto; font-family: var(--font-num); font-size: 11px; }
+.chart-table caption { text-align: left; font-family: var(--font-body); font-size: 11px; font-weight: 700; color: var(--fg); padding-bottom: 2px; }
+.chart-table th, .chart-table td { padding: 1px 6px; border: none; }
+.chart-table th { font-family: var(--font-body); font-weight: 400; color: var(--muted); text-align: left; }
+.chart-table thead th { text-align: right; }
+.chart-table td { text-align: right; color: var(--fg); }
+.chart-table tr.sum th, .chart-table tr.sum td { font-weight: 700; color: var(--fg); border-top: 1px solid var(--line); }
+@media (max-width: 600px) { .chart-table { position: static; margin-top: 12px; overflow-x: auto; } }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 .warn { color: var(--warn); }
 .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); margin-left: 6px; font-family: var(--font-body); }
@@ -132,7 +142,7 @@ button:disabled { opacity: 0.6; cursor: default; }
       <button type="button" data-mode="amount" aria-pressed="true">금액 (억원)</button>
       <button type="button" data-mode="share" aria-pressed="false">매출 구성비 (%)</button>
     </div>
-    <div class="panel"><div class="chart-box"><canvas id="chart" aria-label="연도별 매출, 매출이익, 영업이익 그래프"></canvas></div></div>
+    <div class="panel chart-wrap"><div class="chart-box"><canvas id="chart" aria-label="연도별 부문별 매출과 영업이익 그래프"></canvas></div><div class="chart-table" id="chartTable"></div></div>
   </section>
 
   <section>
@@ -490,22 +500,16 @@ const valueLabels = {
 function drawChart(R) {
   if (typeof Chart === "undefined") return;
   const share = chartMode === "share";
-  // 연도 아래에 이익 금액 (판관비가 있으면 영업이익도)
-  const labels = years().map((yr, i) => {
-    const y = R.Y[i], lines = [`${yr}년`];
-    if (!share) {
-      lines.push(`매출이익 ${fmtEok(y.gross.total)}`);
-      if (Math.abs(y.op.total - y.gross.total) >= 1) lines.push(`영업이익 ${fmtEok(y.op.total)}`);
-    }
-    return lines;
-  });
+  // 연도 아래에 영업이익 금액
+  const labels = years().map((yr, i) => share ? [`${yr}년`] : [`${yr}년`, `영업이익 ${fmtEok(R.Y[i].op.total)}`]);
   const val = (y, v) => share ? (y.rev.total ? v / y.rev.total * 100 : 0) : v / EOK;
   const bar = { type: "bar", stack: "s", order: 3, barPercentage: 0.55, categoryPercentage: 0.7, maxBarThickness: 64 };
   const ds = COLS.map(c => ({ ...bar, label: `${c.name} 매출`, backgroundColor: css(c.color), data: R.Y.map(y => +val(y, y.rev[c.key]).toFixed(2)) }));
   if (!share) ds.push(
-    { type: "line", stack: "g", label: "매출이익", data: R.Y.map(y => +(y.gross.total / EOK).toFixed(2)), borderColor: css("--c-gross"), backgroundColor: css("--c-gross"), borderDash: [6, 4], borderWidth: 2, pointRadius: 3, tension: 0.2, order: 2 },
-    { type: "line", stack: "o", label: "영업이익", data: R.Y.map(y => +(y.op.total / EOK).toFixed(2)), borderColor: css("--c-profit"), backgroundColor: css("--c-profit"), borderWidth: 2, pointRadius: 4, tension: 0.2, order: 1 },
+    { type: "line", stack: "o", label: "영업이익", data: R.Y.map(y => +(y.op.total / EOK).toFixed(2)), borderColor: css("--c-profit"), backgroundColor: css("--surface"),
+      borderWidth: 3, pointRadius: 5, pointBorderWidth: 2, pointHoverRadius: 6, tension: 0.2, order: 1 },
   );
+  renderChartTable(R, share);
   const fg = css("--muted"), grid = css("--line");
   if (chart) chart.destroy();
   chart = new Chart($("chart"), {
@@ -529,9 +533,24 @@ function drawChart(R) {
       },
     },
   });
-  chart.$labels = { mode: chartMode, total: R.Y.map(y => y.rev.total), gross: R.Y.map(y => y.gross.total), op: R.Y.map(y => y.op.total),
-    grossIdx: COLS.length, opIdx: COLS.length + 1, fg: css("--fg"), grossColor: css("--c-gross"), opColor: css("--c-profit") };
+  chart.$labels = { mode: chartMode, total: R.Y.map(y => y.rev.total), fg: css("--fg") };
   chart.draw();
+  // 데이터 표를 그래프 영역 좌측 상단에 맞춘다 (좁은 화면에서는 CSS가 그래프 아래로 내림)
+  const tb = $("chartTable");
+  tb.style.left = `${chart.chartArea.left + 8}px`;
+  tb.style.top = `${chart.chartArea.top + 4}px`;
+}
+
+// 그래프 안 좌측 상단: 부문별 매출액 데이터 표 (억원)
+function renderChartTable(R, share) {
+  const tb = $("chartTable");
+  tb.hidden = share;
+  if (share) return;
+  const eok = v => (v / EOK).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  tb.innerHTML = `<table><caption>부문별 매출액 (억원)</caption><thead><tr><th></th>${years().map(y => `<th>${String(y).slice(2)}년</th>`).join("")}</tr></thead><tbody>` +
+    COLS.map(c => `<tr><th><span class="dot" style="background:var(${c.color})"></span>${c.name}</th>${R.Y.map(y => `<td>${eok(y.rev[c.key])}</td>`).join("")}</tr>`).join("") +
+    `<tr class="sum"><th>합계</th>${R.Y.map(y => `<td>${eok(y.rev.total)}</td>`).join("")}</tr>` +
+    "</tbody></table>";
 }
 $("chartMode").addEventListener("click", e => {
   const b = e.target.closest("button[data-mode]");
