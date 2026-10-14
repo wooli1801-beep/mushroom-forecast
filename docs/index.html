@@ -507,7 +507,7 @@ function drawChart(R) {
   if (typeof Chart === "undefined") return;
   const share = chartMode === "share";
   // 연도 아래에 영업이익 금액
-  const labels = years().map((yr, i) => share ? [`${yr}년`] : [`${yr}년`, `영업이익 ${fmtEok(R.Y[i].op.total)}`]);
+  const labels = years().map((yr, i) => share ? [`${yr}년`] : [`${yr}년`, `영업이익 ${fmtEok(R.Y[i].op.total)} (${fmtPct(R.Y[i].op.total / R.Y[i].rev.total)})`]);
   const val = (y, v) => share ? (y.rev.total ? v / y.rev.total * 100 : 0) : v / EOK;
   const bar = { type: "bar", stack: "s", order: 3, barPercentage: 0.55, categoryPercentage: 0.7, maxBarThickness: 64 };
   const ds = COLS.map(c => ({ ...bar, label: `${c.name} 매출`, backgroundColor: css(c.color), data: R.Y.map(y => +val(y, y.rev[c.key]).toFixed(2)) }));
