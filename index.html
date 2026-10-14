@@ -297,9 +297,9 @@ function buildInputs() {
     row("수매단가", "원/kg · 모둘러 위탁", "price.buy") +
     group("배지", "--c-med") + row("판매단가", "원/개", "price.medium") +
     group("모둘러", "--c-mod") + row("판매단가", "원/대", "price.modular") +
-    group("매출원가율 (%)") +
+    group("부문별 매출원가율 (%)") +
     row("자체 생산", "%", "cost.self", "0.1") +
-    crow("위탁생산-모둘러", "% · 수매단가 ÷ 판매단가", "c-crmod") +
+    crow("위탁생산(모듈러)", "% · 수매단가 ÷ 판매단가", "c-crmod") +
     row("배지 매출", "%", "cost.medium", "0.1") +
     row("모둘러 판매", "%", "cost.modSale", "0.1") +
     group("판매관리비율 (%)") +
@@ -376,7 +376,7 @@ function renderDetail(R) {
     tr("배지 판매단가", "원/개", e + e + c(fmtInt(S.price.medium[detailYear])) + e + e) +
     tr("수매단가", "원/kg", e + c(fmtInt(S.price.buy[detailYear])) + e + e + e) +
     tr("판매단가", "원/kg · 원/대", c(fmtInt(S.price.mush[detailYear])) + c(fmtInt(S.price.mush[detailYear])) + e + c(fmtInt(S.price.modular[detailYear])) + e) +
-    tr("매출원가율", "", COLS.map(k => c(fmtPct(y.cr[k.key]))).join("") + e) +
+    tr("부문별 매출원가율", "", COLS.map(k => c(fmtPct(y.cr[k.key]))).join("") + e) +
     moneyRow("연간 매출액", y.rev, "total") +
     moneyRow("매출원가", y.cogs) +
     moneyRow("매출이익", y.gross, "profit") +
@@ -625,7 +625,7 @@ function buildWorkbook() {
       ["배지", "배지판매단가-개당", "원", "", "", n(S.price.medium[i]), "", ""],
       ["버섯", "수매단가-kg당", "원", "", n(S.price.buy[i]), "", "", ""],
       ["버섯", "판매단가-kg당", "원", n(S.price.mush[i]), n(S.price.mush[i]), "", n(S.price.modular[i]), ""],
-      ["", "매출원가율", "", ...COLS.map(c => v.cr[c.key]), ""],
+      ["", "부문별 매출원가율", "", ...COLS.map(c => v.cr[c.key]), ""],
       ["총매출", "년간예상매출", "원", ...COLS.map(c => v.rev[c.key]), v.rev.total],
       ["원가", "매출원가", "원", ...COLS.map(c => v.cogs[c.key]), v.cogs.total],
       ["매출이익", "", "원", ...COLS.map(c => v.gross[c.key]), v.gross.total],
@@ -704,9 +704,9 @@ const YEAR_ROWS = [
   ["버섯", "수매단가", "원/kg", "price.buy"],
   ["배지", "판매단가", "원/개", "price.medium"],
   ["모둘러", "판매단가", "원/대", "price.modular"],
-  ["매출원가율", "자체 생산", "%", "cost.self"],
-  ["매출원가율", "배지 매출", "%", "cost.medium"],
-  ["매출원가율", "모둘러 판매", "%", "cost.modSale"],
+  ["부문별 매출원가율", "자체 생산", "%", "cost.self"],
+  ["부문별 매출원가율", "배지 매출", "%", "cost.medium"],
+  ["부문별 매출원가율", "모둘러 판매", "%", "cost.modSale"],
   ["판매관리비율", "판관비율", "%", "sga"],
   ["배지", "생산량", "개", "medium.prod"],
   ["투자", "투자 내용", "글자", "invest.label"],
