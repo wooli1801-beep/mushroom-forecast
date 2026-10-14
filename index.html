@@ -11,9 +11,9 @@
   --muted: #5e6862;
   --line: #d9ddd7;
   --accent: #3d6b4f;      /* 이끼색: 자체 생산 */
-  --c-mush: #b4772d;      /* 위탁생산-모둘러 */
+  --c-mush: #b4772d;      /* 위탁생산-모듈러 */
   --c-med: #8c7b4a;       /* 배지 매출 */
-  --c-mod: #4c6a8c;       /* 모둘러 판매 */
+  --c-mod: #4c6a8c;       /* 모듈러 판매 */
   --c-gross: #8a948e;     /* 매출이익 선 */
   --c-profit: #1d2420;    /* 영업이익 선 */
   --input-bg: #fff4c2;    /* 입력칸: 엑셀 '입력' 노란색 계열 */
@@ -96,7 +96,7 @@ button:disabled { opacity: 0.6; cursor: default; }
   <header>
     <div>
       <h1>버섯사업 4개년 손익계획</h1>
-      <p class="sub">자체 생산 · 위탁생산(모둘러) · 배지 매출 · 모둘러 판매의 매출, 매출이익, 영업이익과 배지 재고, 투자비를 계산합니다.</p>
+      <p class="sub">자체 생산 · 위탁생산(모듈러) · 배지 매출 · 모듈러 판매의 매출, 매출이익, 영업이익과 배지 재고, 투자비를 계산합니다.</p>
     </div>
     <div class="controls">
       <label class="ctl">시작 연도<input id="startYear" type="number" step="1"></label>
@@ -148,7 +148,7 @@ button:disabled { opacity: 0.6; cursor: default; }
   </section>
 
   <section>
-    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 자체 생산 투입 − 모둘러 공급(배지 판매) · 기말재고는 다음 해 기초재고로 이월</small></h2>
+    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 자체 생산 투입 − 모듈러 공급(배지 판매) · 기말재고는 다음 해 기초재고로 이월</small></h2>
     <div class="panel tbl-wrap"><table id="mediumTbl"></table></div>
     <div class="row"><button id="fillMedium" type="button">생산량을 필요량으로 채우기</button></div>
   </section>
@@ -166,9 +166,9 @@ button:disabled { opacity: 0.6; cursor: default; }
 const FIX = { selfPer: 3000, modPer: 1000, turns: 18, firstYear: 0.5 };
 const COLS = [
   { key: "own",  name: "자체 생산",        color: "--accent" },
-  { key: "mod",  name: "위탁생산-모둘러",   color: "--c-mush" },
+  { key: "mod",  name: "위탁생산-모듈러",   color: "--c-mush" },
   { key: "med",  name: "위탁생산-배지매출", color: "--c-med" },
-  { key: "sale", name: "모둘러 판매",       color: "--c-mod" },
+  { key: "sale", name: "모듈러 판매",       color: "--c-mod" },
 ];
 const PYEONG_M2 = 3.305785;
 const STORE_KEY = "mushroom-forecast-v1";
@@ -236,8 +236,8 @@ function calcYear(i) {
   const rev = {
     own: mush * kgSelf,
     mod: mush * kgMod,
-    med: n(S.price.medium[i]) * inMod,          // 배지 판매수 = 모둘러 배지 투입수
-    sale: newMod * n(S.price.modular[i]),        // 모둘러 판매 = 신규 대수 × 단가
+    med: n(S.price.medium[i]) * inMod,          // 배지 판매수 = 모듈러 배지 투입수
+    sale: newMod * n(S.price.modular[i]),        // 모듈러 판매 = 신규 대수 × 단가
   };
   const cr = {
     own: n(S.cost.self[i]) / 100,
@@ -290,22 +290,22 @@ function buildInputs() {
   $("inTbl").innerHTML = yearHead("항목") + "<tbody>" +
     group("생산동수") +
     row("자체 생산", "동", "dong.self") + crow("신규증가", "동 · 전년 대비", "c-newself") +
-    row("모둘러", "대", "dong.mod") + crow("신규증가", "대 · 전년 대비", "c-newmod") +
+    row("모듈러", "대", "dong.mod") + crow("신규증가", "대 · 전년 대비", "c-newmod") +
     group("버섯") +
     row("배지당 수확량", "kg", "yieldKg", "0.01") +
     row("판매단가", "원/kg", "price.mush") +
-    row("수매단가", "원/kg · 모둘러 위탁", "price.buy") +
+    row("수매단가", "원/kg · 모듈러 위탁", "price.buy") +
     group("배지", "--c-med") + row("판매단가", "원/개", "price.medium") +
-    group("모둘러", "--c-mod") + row("판매단가", "원/대", "price.modular") +
+    group("모듈러", "--c-mod") + row("판매단가", "원/대", "price.modular") +
     group("부문별 매출원가율 (%)") +
     row("자체 생산", "%", "cost.self", "0.1") +
     crow("위탁생산(모듈러)", "% · 수매단가 ÷ 판매단가", "c-crmod") +
     row("배지 매출", "%", "cost.medium", "0.1") +
-    row("모둘러 판매", "%", "cost.modSale", "0.1") +
+    row("모듈러 판매", "%", "cost.modSale", "0.1") +
     group("판매관리비율 (%)") +
     row("판관비율", "% · 모든 매출에 적용", "sga", "0.1") +
     "</tbody>";
-  $("fixedNote").textContent = `고정값: 1회 배지 입상수 자체 생산 ${fmtInt(FIX.selfPer)}개/동, 모둘러 ${fmtInt(FIX.modPer)}개/대 · 연간 회전수 ${FIX.turns}회(20일) · 신규 동은 첫해 ${FIX.firstYear * 100}%만 가동`;
+  $("fixedNote").textContent = `고정값: 1회 배지 입상수 자체 생산 ${fmtInt(FIX.selfPer)}개/동, 모듈러 ${fmtInt(FIX.modPer)}개/대 · 연간 회전수 ${FIX.turns}회(20일) · 신규 동은 첫해 ${FIX.firstYear * 100}%만 가동`;
 
   $("yearTabs").innerHTML = years().map((y, i) => `<button type="button" data-year="${i}" aria-pressed="${i === detailYear}">${y}년 (${i + 1}년차)</button>`).join("");
 
@@ -313,7 +313,7 @@ function buildInputs() {
     `<tr><td>기초재고<span class="unit">개 · 2년차부터 전년 기말재고</span></td><td>${inp("medium.opening")}</td>${[1,2,3].map(i => `<td class="num" id="c-open-${i}"></td>`).join("")}</tr>` +
     row("생산량", "개", "medium.prod") +
     crow("자체 생산 투입", "개", "c-inself") +
-    crow("모둘러 공급 (배지 판매)", "개", "c-inmod") +
+    crow("모듈러 공급 (배지 판매)", "개", "c-inmod") +
     `<tr class="total"><td>기말재고 (외부 판매가능수)<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-close-${i}"></td>`).join("")}</tr>` +
     "</tbody>";
 
@@ -370,7 +370,7 @@ function renderDetail(R) {
     tr("배지 투입수 (판매수)", "개", c(fmtInt(y.inSelf)) + c(fmtInt(y.inMod)) + c(fmtInt(y.inMod)) + e + c(fmtInt(y.inSelf + 2 * y.inMod))) +
     `<tr class="basis"><td>산출 근거<span class="unit">신규는 첫해 ${FIX.firstYear * 100}%</span></td>` +
       `<td>${basisHtml(y.newSelf, y.self, FIX.selfPer, "동")}</td><td>${basisHtml(y.newMod, y.mod, FIX.modPer, "대")}</td>` +
-      `<td>모둘러 투입수와 같음<br>(모둘러에 배지 판매)</td><td></td><td>자체 + 모둘러 + 배지매출 열의 합<br>(엑셀 합계와 같은 방식)</td></tr>` +
+      `<td>모듈러 투입수와 같음<br>(모듈러에 배지 판매)</td><td></td><td>자체 + 모듈러 + 배지매출 열의 합<br>(엑셀 합계와 같은 방식)</td></tr>` +
     tr("버섯 생산량", "kg", c(fmtInt(y.kgSelf)) + c(fmtInt(y.kgMod)) + e + e + c(fmtInt(y.kgSelf + y.kgMod)), "profit") +
     tr("톤 환산", "t", c(fmtTon(y.kgSelf)) + c(fmtTon(y.kgMod)) + e + e + c(fmtTon(y.kgSelf + y.kgMod))) +
     tr("배지 판매단가", "원/개", e + e + c(fmtInt(S.price.medium[detailYear])) + e + e) +
@@ -429,7 +429,7 @@ function update() {
     line("판매관리비", y => y.sga.total) +
     line("영업이익", y => y.op.total, "profit") +
     rate("영업이익률", y => y.op.total, y => y.rev.total) +
-    qty("버섯 생산량 (톤 · 자체+모둘러)", y => y.kgSelf + y.kgMod, fmtTon) +
+    qty("버섯 생산량 (톤 · 자체+모듈러)", y => y.kgSelf + y.kgMod, fmtTon) +
     `<tr class="calc"><td>배지 기말재고 (외부 판매가능수, 개)</td>${R.Y.map(y => `<td class="num">${fmtInt(y.inv.close)}</td>`).join("")}<td></td></tr>` +
     `<tr class="calc"><td>투자비</td>${R.invY.map(v => `<td class="num">${money(v)}</td>`).join("")}<td class="num">${money(R.investTotal)}</td></tr>` +
     "</tbody>";
@@ -618,7 +618,7 @@ function buildWorkbook() {
       ["", "년간 회전수(20일)", "회", FIX.turns, FIX.turns, FIX.turns, "", ""],
       ["버섯", "배지당 수확량", "kg", v.yk, v.yk, "", "", ""],
       ["", "배지 투입수(판매수)", "개", v.inSelf, v.inMod, v.inMod, "", v.inSelf + 2 * v.inMod],
-      ["", "  산출 근거(신규)", "", basisParts(v.newSelf, v.self, FIX.selfPer).newText, basisParts(v.newMod, v.mod, FIX.modPer).newText, "모둘러 투입수와 같음", "", ""],
+      ["", "  산출 근거(신규)", "", basisParts(v.newSelf, v.self, FIX.selfPer).newText, basisParts(v.newMod, v.mod, FIX.modPer).newText, "모듈러 투입수와 같음", "", ""],
       ["", "  산출 근거(기존)", "", basisParts(v.newSelf, v.self, FIX.selfPer).oldText, basisParts(v.newMod, v.mod, FIX.modPer).oldText, "", "", ""],
       ["버섯", "생산량", "kg", v.kgSelf, v.kgMod, "", "", v.kgSelf + v.kgMod],
       ["", "톤환산", "t", v.kgSelf / 1000, v.kgMod / 1000, "", "", (v.kgSelf + v.kgMod) / 1000],
@@ -643,7 +643,7 @@ function buildWorkbook() {
     ["기초재고 (전년 기말재고 이월)", ...R.Y.map(v => v.inv.open)],
     ["생산량", ...S.medium.prod.map(n)],
     ["자체 생산 투입", ...R.Y.map(v => v.inSelf)],
-    ["모둘러 공급 (배지 판매)", ...R.Y.map(v => v.inMod)],
+    ["모듈러 공급 (배지 판매)", ...R.Y.map(v => v.inMod)],
     ["기말재고 (외부 판매가능수)", ...R.Y.map(v => v.inv.close)],
   ], [24, 14, 14, 14, 14]), "배지재고");
 
@@ -698,15 +698,15 @@ $("xlsxBtn").addEventListener("click", e =>
 // 양식의 각 행: 구분 | 항목 | 단위 | 1년차 | 2년차 | 3년차 | 4년차 | 코드(수정 금지)
 const YEAR_ROWS = [
   ["생산동수", "자체 생산", "동", "dong.self"],
-  ["생산동수", "모둘러", "대", "dong.mod"],
+  ["생산동수", "모듈러", "대", "dong.mod"],
   ["버섯", "배지당 수확량", "kg", "yieldKg"],
   ["버섯", "판매단가", "원/kg", "price.mush"],
   ["버섯", "수매단가", "원/kg", "price.buy"],
   ["배지", "판매단가", "원/개", "price.medium"],
-  ["모둘러", "판매단가", "원/대", "price.modular"],
+  ["모듈러", "판매단가", "원/대", "price.modular"],
   ["부문별 매출원가율", "자체 생산", "%", "cost.self"],
   ["부문별 매출원가율", "배지 매출", "%", "cost.medium"],
-  ["부문별 매출원가율", "모둘러 판매", "%", "cost.modSale"],
+  ["부문별 매출원가율", "모듈러 판매", "%", "cost.modSale"],
   ["판매관리비율", "판관비율", "%", "sga"],
   ["배지", "생산량", "개", "medium.prod"],
   ["투자", "투자 내용", "글자", "invest.label"],
