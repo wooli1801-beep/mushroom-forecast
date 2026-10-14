@@ -99,6 +99,14 @@ button:disabled { opacity: 0.6; cursor: default; }
 .note { color: var(--muted); font-size: 12px; margin: 0; }
 .example { font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 4px; padding: 6px 10px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fac-plan { display: grid; gap: 8px; }
+.fac-head { justify-content: space-between; }
+.fac-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.fac-box { background: var(--surface); border: 1px solid var(--fg); border-radius: 6px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
+.fac-box h3 { margin: 0; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fac-box h3 span { font-family: var(--font-num); font-weight: 500; color: var(--muted); font-size: 12px; }
+.fac-box ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.fac-box b { font-family: var(--font-num); color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
@@ -161,6 +169,14 @@ button:disabled { opacity: 0.6; cursor: default; }
     <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 배지 최대 생산량 − 배지 소비량 · 기말재고는 다음 해 기초재고로 이월</small></h2>
     <div class="panel tbl-wrap"><table id="mediumTbl"></table></div>
     <div class="row"><button id="fillMedium" type="button">최대 생산량을 소비량에 맞추기</button></div>
+    <div class="fac-plan">
+      <div class="row fac-head">
+        <strong>재고 소진에 필요한 생산 시설</strong>
+        <label class="note">자체생산(버섯) 비율 <input id="selfShare" type="number" min="0" max="100" step="1" style="width:64px"> % : 위탁생산버섯(모듈러) <span id="modShare"></span> %</label>
+      </div>
+      <p class="note" id="facNote"></p>
+      <div class="fac-grid" id="facBoxes"></div>
+    </div>
   </section>
 
   <section>
@@ -193,7 +209,7 @@ function defaults() {
     price:  { mush: [12000, 12000, 12000, 12000], buy: [8000, 8000, 8000, 8000], medium: [3500, 3500, 3500, 3500], modular: [75000000, 75000000, 75000000, 75000000] },
     cost:   { self: [40, 40, 40, 40], medium: [33, 33, 33, 33], modSale: [66.7, 50, 50, 50] },
     sga: [0, 0, 0, 0],
-    medium: { opening: 0, prod: [342000, 954000, 2052000, 4590000] },
+    medium: { opening: 0, prod: [342000, 954000, 2052000, 4590000], selfShare: 40 },
     invest: {
       label:     ["1차: 100만개 시설", "", "2차: 1,000만개 시설", ""],
       landArea:  [1500, 0, 6000, 0],
@@ -212,6 +228,7 @@ if (S.ver !== DATA_VER) {
   if (S.invest && Array.isArray(S.invest.landArea)) keep.invest = S.invest;
   S = Object.assign(d, keep);
 }
+if (S.medium.selfShare === undefined) S.medium.selfShare = 40;
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
 
 const $ = id => document.getElementById(id);
@@ -266,6 +283,42 @@ function calcYear(i) {
   for (const o of [rev, cogs, gross, sga, op]) o.total = COLS.reduce((s, c) => s + o[c.key], 0);
   return { self, mod, newSelf, newMod, inSelf, inMod, yk, kgSelf, kgMod, rev, cr, cogs, gross, sga, op };
 }
+// 기말재고를 모두 소진하는 데 필요한 추가 시설 (연간 가동 기준, 자체:위탁 비율로 나눔)
+const STOCK_THRESHOLD = 200000;
+function facilityPlan(y) {
+  const stock = y.inv.close;
+  if (stock <= STOCK_THRESHOLD) return null;
+  const share = Math.min(100, Math.max(0, n(S.medium.selfShare))) / 100;
+  const selfYear = FIX.selfPer * FIX.turns, modYear = FIX.modPer * FIX.turns; // 동·대당 연간 배지 소비
+  const selfQty = stock * share, modQty = stock - selfQty;
+  const selfUnits = Math.ceil(selfQty / selfYear - 1e-9), modUnits = Math.ceil(modQty / modYear - 1e-9);
+  return { stock, share, selfQty, modQty, selfUnits, modUnits, selfYear, modYear,
+    selfUse: selfUnits * selfYear, modUse: modUnits * modYear };
+}
+function planText(yr, y) {
+  const p = y.plan;
+  return `${yr}년: 기말재고 ${fmtInt(p.stock)}개 소진을 위해 자체생산(버섯) 시설(동당 1회 ${fmtInt(FIX.selfPer)}개 기준) ${fmtInt(p.selfUnits)}동 증축` +
+    ` (현재 ${fmtInt(y.self)}동 → ${fmtInt(y.self + p.selfUnits)}동), 위탁생산버섯(모듈러, 대당 1회 ${fmtInt(FIX.modPer)}개 기준) ${fmtInt(p.modUnits)}대 필요` +
+    ` (현재 ${fmtInt(y.mod)}대 → ${fmtInt(y.mod + p.modUnits)}대)`;
+}
+function renderFacilityPlan(R) {
+  const share = Math.min(100, Math.max(0, n(S.medium.selfShare)));
+  $("modShare").textContent = 100 - share;
+  $("facNote").textContent = `기말재고가 ${fmtInt(STOCK_THRESHOLD)}개를 넘는 해만 표시합니다. 시설 1개의 연간 배지 소비량: 자체생산 동당 ${fmtInt(FIX.selfPer)} × ${FIX.turns}회 = ${fmtInt(FIX.selfPer * FIX.turns)}개, 모듈러 대당 ${fmtInt(FIX.modPer)} × ${FIX.turns}회 = ${fmtInt(FIX.modPer * FIX.turns)}개 (1년 내내 가동 기준, 올림).`;
+  const boxes = R.Y.map((y, i) => {
+    const p = y.plan, yr = years()[i];
+    if (!p) return "";
+    return `<div class="fac-box"><h3>${yr}년 <span>기말재고 ${fmtInt(p.stock)}개</span></h3>
+      <p class="note">재고 소비를 위해 (자체 ${share} : 위탁 ${100 - share})</p>
+      <ul>
+        <li>자체생산(버섯) 시설 (동당 1회 ${fmtInt(FIX.selfPer)}개 기준) <b>${fmtInt(p.selfUnits)}동</b> 증축
+          <br><span class="unit">배지 ${fmtInt(p.selfQty)}개 ÷ ${fmtInt(p.selfYear)}개/동 · 현재 ${fmtInt(y.self)}동 → ${fmtInt(y.self + p.selfUnits)}동</span></li>
+        <li>위탁생산버섯(모듈러) (대당 1회 ${fmtInt(FIX.modPer)}개 기준) <b>${fmtInt(p.modUnits)}대</b> 필요
+          <br><span class="unit">배지 ${fmtInt(p.modQty)}개 ÷ ${fmtInt(p.modYear)}개/대 · 현재 ${fmtInt(y.mod)}대 → ${fmtInt(y.mod + p.modUnits)}대</span></li>
+      </ul></div>`;
+  }).join("");
+  $("facBoxes").innerHTML = boxes || `<p class="note">모든 연도의 기말재고가 ${fmtInt(STOCK_THRESHOLD)}개 이하라 추가 시설이 필요하지 않습니다.</p>`;
+}
 function calc() {
   const Y = [0, 1, 2, 3].map(calcYear);
   let stock = n(S.medium.opening);
@@ -273,6 +326,7 @@ function calc() {
     const open = stock;
     stock = open + n(S.medium.prod[i]) - y.inSelf - y.inMod;
     y.inv = { open, close: stock, need: y.inSelf + y.inMod };
+    y.plan = facilityPlan(y);
   });
   const I = S.invest;
   const land = [0, 1, 2, 3].map(i => n(I.landArea[i]) * n(I.landPrice[i]));
@@ -349,6 +403,7 @@ function buildInputs() {
 
   $("startYear").value = S.startYear;
   $("unitSel").value = String(S.unit);
+  $("selfShare").value = S.medium.selfShare;
 }
 
 // 배지 투입수 산출 근거: 신규×입상수×회전수×0.5 + 기존×입상수×회전수
@@ -455,6 +510,7 @@ function update() {
   ].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${money(v)}<span class="unit">${unitName()}</span></div></div>`).join("");
 
   renderDetail(R);
+  renderFacilityPlan(R);
   drawChart(R);
   save();
 }
@@ -568,6 +624,7 @@ document.addEventListener("input", e => {
   if (p) { set(p, e.target.value === "" ? 0 : +e.target.value); update(); }
 });
 $("startYear").addEventListener("input", e => { S.startYear = +e.target.value || 2027; rebuild(); });
+$("selfShare").addEventListener("input", e => { S.medium.selfShare = Math.min(100, Math.max(0, +e.target.value || 0)); update(); });
 $("unitSel").addEventListener("change", e => { S.unit = +e.target.value; rebuild(); });
 $("yearTabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-year]");
@@ -667,6 +724,9 @@ function buildWorkbook() {
     ["  자체생산(버섯) 투입", ...R.Y.map(v => v.inSelf)],
     ["  모듈러 공급 (배지 판매)", ...R.Y.map(v => v.inMod)],
     ["기말재고 (외부 판매가능수)", ...R.Y.map(v => v.inv.close)],
+    [],
+    [`재고 소진에 필요한 생산 시설 (자체 ${n(S.medium.selfShare)} : 위탁 ${100 - n(S.medium.selfShare)}, 기말재고 ${fmtInt(STOCK_THRESHOLD)}개 초과 연도)`],
+    ...R.Y.map((v, i) => v.plan ? [planText(years()[i], v)] : null).filter(Boolean),
   ], [24, 14, 14, 14, 14]), "배지재고");
 
   const I = S.invest;
