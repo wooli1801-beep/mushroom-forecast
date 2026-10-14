@@ -164,9 +164,9 @@ button:disabled { opacity: 0.6; cursor: default; }
   </section>
 
   <section>
-    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 생산량 − 자체생산(버섯) 투입 − 모듈러 공급(배지 판매) · 기말재고는 다음 해 기초재고로 이월</small></h2>
+    <h2>배지 생산 · 재고 <small>기말재고 = 기초재고 + 배지 최대 생산량 − 배지 소비량 · 기말재고는 다음 해 기초재고로 이월</small></h2>
     <div class="panel tbl-wrap"><table id="mediumTbl"></table></div>
-    <div class="row"><button id="fillMedium" type="button">생산량을 필요량으로 채우기</button></div>
+    <div class="row"><button id="fillMedium" type="button">최대 생산량을 소비량에 맞추기</button></div>
   </section>
 
   <section>
@@ -326,10 +326,11 @@ function buildInputs() {
   $("yearTabs").innerHTML = years().map((y, i) => `<button type="button" data-year="${i}" aria-pressed="${i === detailYear}">${y}년 (${i + 1}년차)</button>`).join("");
 
   $("mediumTbl").innerHTML = yearHead("항목") + "<tbody>" +
+    row("배지 최대 생산량", "개", "medium.prod") +
     `<tr><td>기초재고<span class="unit">개 · 2년차부터 전년 기말재고</span></td><td>${inp("medium.opening")}</td>${[1,2,3].map(i => `<td class="num" id="c-open-${i}"></td>`).join("")}</tr>` +
-    row("생산량", "개", "medium.prod") +
-    crow("자체생산(버섯) 투입", "개", "c-inself") +
-    crow("모듈러 공급 (배지 판매)", "개", "c-inmod") +
+    `<tr><td>배지 소비량<span class="unit">개 · 아래 두 항목의 합</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-use-${i}"></td>`).join("")}</tr>` +
+    crow("└ 자체생산(버섯) 투입", "개", "c-inself") +
+    crow("└ 모듈러 공급 (배지 판매)", "개", "c-inmod") +
     `<tr class="total"><td>기말재고 (외부 판매가능수)<span class="unit">개</span></td>${[0,1,2,3].map(i => `<td class="num" id="c-close-${i}"></td>`).join("")}</tr>` +
     "</tbody>";
 
@@ -410,6 +411,7 @@ function update() {
     t(`c-newself-${i}`, fmtInt(y.newSelf) + (y.newSelf < 0 ? `<span class="badge">감소</span>` : ""));
     t(`c-newmod-${i}`, fmtInt(y.newMod) + (y.newMod < 0 ? `<span class="badge">감소</span>` : ""));
     t(`c-crmod-${i}`, fmtPct(y.cr.mod));
+    t(`c-use-${i}`, fmtInt(y.inSelf + y.inMod));
     t(`c-inself-${i}`, fmtInt(y.inSelf));
     t(`c-inmod-${i}`, fmtInt(y.inMod));
     if (i > 0) t(`c-open-${i}`, fmtInt(y.inv.open));
@@ -582,7 +584,7 @@ $("yearTabs").addEventListener("click", e => {
 });
 $("fillMedium").addEventListener("click", () => {
   const R = calc();
-  // 기초재고를 감안해 기말재고가 0이 되도록 생산량을 맞춘다
+  // 기초재고를 감안해 기말재고가 0이 되도록 최대 생산량을 맞춘다
   let stock = n(S.medium.opening);
   R.Y.forEach((y, i) => { S.medium.prod[i] = Math.max(0, y.inv.need - stock); stock += S.medium.prod[i] - y.inv.need; });
   rebuild();
@@ -665,10 +667,11 @@ function buildWorkbook() {
 
   XLSX.utils.book_append_sheet(wb, sheet([
     ["항목 (개)", ...y],
+    ["배지 최대 생산량", ...S.medium.prod.map(n)],
     ["기초재고 (전년 기말재고 이월)", ...R.Y.map(v => v.inv.open)],
-    ["생산량", ...S.medium.prod.map(n)],
-    ["자체생산(버섯) 투입", ...R.Y.map(v => v.inSelf)],
-    ["모듈러 공급 (배지 판매)", ...R.Y.map(v => v.inMod)],
+    ["배지 소비량", ...R.Y.map(v => v.inSelf + v.inMod)],
+    ["  자체생산(버섯) 투입", ...R.Y.map(v => v.inSelf)],
+    ["  모듈러 공급 (배지 판매)", ...R.Y.map(v => v.inMod)],
     ["기말재고 (외부 판매가능수)", ...R.Y.map(v => v.inv.close)],
   ], [24, 14, 14, 14, 14]), "배지재고");
 
@@ -733,7 +736,7 @@ const YEAR_ROWS = [
   ["부문별 매출원가율", "배지매출(위탁생산)", "%", "cost.medium"],
   ["부문별 매출원가율", "모듈러 판매", "%", "cost.modSale"],
   ["판매관리비율", "판관비율", "%", "sga"],
-  ["배지", "생산량", "개", "medium.prod"],
+  ["배지", "최대 생산량", "개", "medium.prod"],
   ["투자", "투자 내용", "글자", "invest.label"],
   ["투자", "부지 면적", "평", "invest.landArea"],
   ["투자", "부지 평당 단가", "원", "invest.landPrice"],
