@@ -22,6 +22,8 @@
   --c-mod: #4c6a8c;       /* 모듈러 판매 */
   --c-gross: #8a948e;     /* 매출이익 선 */
   --c-profit: #ff5c8a;    /* 영업이익 추세선: 밝은 분홍 */
+  /* 그래프 4부문 (색약 구분 검증 통과한 팔레트) + 영업이익 선 */
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s-line: #6250d6;
   --input-bg: #fff4c2;    /* 입력칸: 엑셀 '입력' 노란색 계열 */
   --input-line: #cfa93a;
   --input-fg: #3a2f00;
@@ -34,13 +36,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
-    --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #ff8fb0;
+    --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #ff8fb0; --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s-line: #9085e9;
     --input-bg: #3b3418; --input-line: #9c8433; --input-fg: #fbefc0; --row-alt: #222a25; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #151a17; --surface: #1d2420; --fg: #e6ebe7; --muted: #9aa59e; --line: #333d37;
-  --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #ff8fb0;
+  --accent: #7fb08f; --c-mush: #d9a35d; --c-med: #c4b27c; --c-mod: #8eaccc; --c-gross: #9aa59e; --c-profit: #ff8fb0; --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s-line: #9085e9;
   --input-bg: #3b3418; --input-line: #9c8433; --input-fg: #fbefc0; --row-alt: #222a25; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -102,7 +104,7 @@ input.changed { background: var(--warn-bg); border-color: var(--warn); color: va
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
 .kpi .k { font-size: 12px; color: var(--muted); letter-spacing: 0.02em; }
 .kpi .v { font-family: var(--font-num); font-size: 20px; font-weight: 500; }
-.chart-box { position: relative; height: 420px; }
+.chart-box { position: relative; height: 400px; }
 .chart-wrap { position: relative; }
 .chart-table { position: absolute; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; pointer-events: none; }
 .chart-table table { min-width: 0; width: auto; font-family: var(--font-num); font-size: 11px; }
@@ -238,10 +240,10 @@ input.changed { background: var(--warn-bg); border-color: var(--warn); color: va
 // 고정값 (엑셀의 숫자 셀)
 const FIX = { selfPer: 3000, modPer: 1000, turns: 18, firstYear: 0.5 };
 const COLS = [
-  { key: "own",  name: "자체생산(버섯)",        color: "--accent" },
-  { key: "mod",  name: "위탁생산버섯(모듈러)",   color: "--c-mush" },
-  { key: "med",  name: "배지매출(위탁생산)", color: "--c-med" },
-  { key: "sale", name: "모듈러 판매",       color: "--c-mod" },
+  { key: "own",  name: "자체생산(버섯)",      color: "--s1", ink: "#ffffff" },
+  { key: "mod",  name: "위탁생산버섯(모듈러)", color: "--s2", ink: "#ffffff" },
+  { key: "med",  name: "배지매출(위탁생산)",   color: "--s3", ink: "#0b1f17" },
+  { key: "sale", name: "모듈러 판매",          color: "--s4", ink: "#2a1d00" },
 ];
 const PYEONG_M2 = 3.305785;
 const STORE_KEY = "mushroom-forecast-v1";
@@ -647,15 +649,15 @@ const valueLabels = {
       ctx.textAlign = "center";
       if (L.mode === "amount") {
         const top = Math.min(...barIdx.map(k => ch.getDatasetMeta(k).data[i].y));
-        ctx.font = "700 12px 'IBM Plex Mono', monospace";
+        ctx.font = "600 12px 'IBM Plex Mono', monospace";
         ctx.fillStyle = L.fg; ctx.textBaseline = "bottom";
-        ctx.fillText(fmtEok(tot), x, top - 4);
+        ctx.fillText(fmtEok(tot), x, top - 6);
       } else {
         barIdx.forEach(k => {
           const el = ch.getDatasetMeta(k).data[i], pct = ch.data.datasets[k].data[i];
           if (pct < 6) return;
           ctx.font = "500 11px 'IBM Plex Mono', monospace";
-          ctx.fillStyle = "#ffffff"; ctx.textBaseline = "middle";
+          ctx.fillStyle = ch.data.datasets[k].ink || "#ffffff"; ctx.textBaseline = "middle";
           ctx.fillText(`${pct.toFixed(1)}%`, el.x, (el.y + el.base) / 2);
         });
         ctx.font = "700 12px 'IBM Plex Mono', monospace";
@@ -673,33 +675,41 @@ function drawChart(R) {
   // 연도 아래에 영업이익 금액
   const labels = years().map((yr, i) => share ? [`${yr}년`] : [`${yr}년`, `영업이익 ${fmtEok(R.Y[i].op.total)} (${fmtPct(R.Y[i].op.total / R.Y[i].rev.total)})`]);
   const val = (y, v) => share ? (y.rev.total ? v / y.rev.total * 100 : 0) : v / EOK;
-  const bar = { type: "bar", stack: "s", order: 3, barPercentage: 0.55, categoryPercentage: 0.7, maxBarThickness: 64 };
-  const ds = COLS.map(c => ({ ...bar, label: `${c.name} 매출`, backgroundColor: css(c.color), data: R.Y.map(y => +val(y, y.rev[c.key]).toFixed(2)) }));
+  // 슬림한 막대: 좁은 폭, 부문 사이 2px 틈(바탕색 테두리), 맨 위 부문만 둥근 모서리
+  const surface = css("--surface");
+  const bar = { type: "bar", stack: "s", order: 3, barPercentage: 0.42, categoryPercentage: 0.62, maxBarThickness: 38,
+    borderColor: surface, borderWidth: { top: 2, bottom: 0, left: 0, right: 0 }, borderSkipped: false };
+  const ds = COLS.map((c, k) => ({ ...bar, label: `${c.name} 매출`, backgroundColor: css(c.color), hoverBackgroundColor: css(c.color), ink: c.ink,
+    borderRadius: k === COLS.length - 1 ? { topLeft: 5, topRight: 5 } : 0, data: R.Y.map(y => +val(y, y.rev[c.key]).toFixed(2)) }));
   if (!share) ds.push(
-    { type: "line", stack: "o", label: "영업이익", data: R.Y.map(y => +(y.op.total / EOK).toFixed(2)), borderColor: css("--c-profit"), backgroundColor: css("--surface"),
-      borderWidth: 3, pointRadius: 5, pointBorderWidth: 2, pointHoverRadius: 6, tension: 0.2, order: 1 },
+    { type: "line", stack: "o", label: "영업이익", data: R.Y.map(y => +(y.op.total / EOK).toFixed(2)), borderColor: css("--s-line"), backgroundColor: css("--s-line"),
+      pointBackgroundColor: surface, pointBorderColor: css("--s-line"), borderWidth: 2.5, pointRadius: 4.5, pointBorderWidth: 2, pointHoverRadius: 6.5, pointHoverBorderWidth: 2.5,
+      tension: 0.35, order: 1 },
   );
   renderChartTable(R, share);
   const fg = css("--muted"), grid = css("--line");
+  const font = { family: "IBM Plex Sans KR", size: 11 };
   if (chart) chart.destroy();
   chart = new Chart($("chart"), {
     data: { labels, datasets: ds },
     plugins: [valueLabels],
     options: {
       maintainAspectRatio: false, animation: false,
-      layout: { padding: { top: 24, right: 8 } },
+      layout: { padding: { top: 26, right: 8, left: 4 } },
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { position: "bottom", labels: { color: fg, boxWidth: 12, font: { family: "IBM Plex Sans KR" } } },
-        tooltip: { callbacks: { label: c => share
+        legend: { position: "bottom", labels: { color: fg, usePointStyle: true, pointStyle: "rectRounded", boxWidth: 9, boxHeight: 9, padding: 16, font: { ...font, size: 12 } } },
+        tooltip: { backgroundColor: "rgba(20,24,22,.92)", padding: 10, cornerRadius: 6, boxPadding: 4, usePointStyle: true,
+          titleFont: { ...font, size: 12, weight: "600" }, bodyFont: { ...font, size: 12 },
+          callbacks: { title: items => String(items[0].label).split(",")[0], label: c => share
           ? `${c.dataset.label}: ${c.parsed.y.toFixed(1)}% (${fmtEok(R.Y[c.dataIndex].rev[COLS[c.datasetIndex].key])})`
           : `${c.dataset.label}: ${c.parsed.y.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}억` } },
       },
       scales: {
-        x: { stacked: true, grid: { display: false }, ticks: { color: fg } },
-        y: { stacked: true, beginAtZero: true, max: share ? 100 : undefined, grid: { color: grid },
-             ticks: { color: fg, callback: v => v.toLocaleString("ko-KR") + (share ? "%" : "") },
-             title: { display: true, text: share ? "매출 구성비 (%)" : "억원", color: fg } },
+        x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: fg, font, padding: 6 } },
+        y: { stacked: true, beginAtZero: true, max: share ? 100 : undefined, border: { display: false, dash: [3, 4] },
+             grid: { color: grid, lineWidth: 1, drawTicks: false }, ticks: { color: fg, font, padding: 8, maxTicksLimit: 6, callback: v => v.toLocaleString("ko-KR") + (share ? "%" : "") },
+             title: { display: true, text: share ? "매출 구성비 (%)" : "억원", color: fg, font } },
       },
     },
   });
