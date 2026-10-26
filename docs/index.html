@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 </head>
 <body>
-<title>버섯사업 4개년 손익계획</title>
+<title>재무계획</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -95,7 +95,15 @@ button.apply.pulse { background: var(--warn); border-color: var(--warn); box-sha
 .apply-status { font-size: 11px; }
 .apply-status.pending { color: var(--warn); font-weight: 700; }
 .apply-status.done { color: var(--accent); }
-input.changed { background: var(--warn-bg); border-color: var(--warn); color: var(--fg); }
+input.changed, textarea.changed { background: var(--warn-bg); border-color: var(--warn); color: var(--fg); }
+.notes-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.note-in { display: grid; gap: 4px; font-size: 13px; font-weight: 500; min-width: 0; }
+.note-in textarea { font: inherit; font-weight: 400; min-height: 120px; resize: vertical; color: var(--input-fg); background: var(--input-bg); border: 1px solid var(--input-line); border-radius: 4px; padding: 6px 8px; line-height: 1.6; width: 100%; }
+.basis-note { background: var(--row-alt); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; }
+.basis-note h4 { margin: 0; font-size: 13px; color: var(--accent); }
+.basis-note p { margin: 0; white-space: pre-wrap; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .notes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .notes-grid { grid-template-columns: 1fr; } }
 .apply-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 10;
   display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 32px);
   background: var(--surface); border: 2px solid var(--warn); border-radius: 8px; padding: 10px 14px; box-shadow: 0 6px 20px rgba(0,0,0,.18); font-size: 13px; }
@@ -149,7 +157,7 @@ input.changed { background: var(--warn-bg); border-color: var(--warn); color: va
 <div class="wrap">
   <header>
     <div>
-      <h1>버섯사업 4개년 손익계획</h1>
+      <h1>재무계획</h1>
       <p class="sub">자체생산(버섯) · 위탁생산버섯(모듈러) · 배지매출(위탁생산) · 모듈러 판매의 매출, 매출이익, 영업이익과 배지 재고, 투자비를 계산합니다.</p>
     </div>
     <div class="controls">
@@ -209,6 +217,11 @@ input.changed { background: var(--warn-bg); border-color: var(--warn); color: va
   </section>
 
   <section>
+    <h2>연도별 정성적 내용 <small>시장 상황·사업 이슈·가정 등을 자유롭게 적으면 연도별 산출 근거에 함께 표시</small></h2>
+    <div class="panel notes-grid" id="notesBox"></div>
+  </section>
+
+  <section>
     <h2>연도별 상세 <small>엑셀 "매출액 예상" 시트와 같은 배치</small></h2>
     <div class="tabs" id="yearTabs" role="group" aria-label="연도 선택"></div>
     <div class="panel tbl-wrap"><table id="detailTbl"></table></div>
@@ -258,6 +271,7 @@ function defaults() {
     price:  { mush: [12000, 12000, 12000, 12000], buy: [8000, 8000, 8000, 8000], medium: [3500, 3500, 3500, 3500], modular: [75000000, 75000000, 75000000, 75000000] },
     cost:   { self: [40, 40, 40, 40], medium: [33, 33, 33, 33], modSale: [66.7, 50, 50, 50] },
     sga: [0, 0, 0, 0],
+    notes: ["", "", "", ""], // 연도별 정성적(임의) 내용
     medium: { opening: 0, prod: [342000, 954000, 2052000, 4590000], selfShare: 40 },
     invest: {
       label:     ["1차: 100만개 시설", "", "2차: 1,000만개 시설", ""],
@@ -278,6 +292,7 @@ if (S.ver !== DATA_VER) {
   S = Object.assign(d, keep);
 }
 if (S.medium.selfShare === undefined) S.medium.selfShare = 40;
+if (!Array.isArray(S.notes)) S.notes = ["", "", "", ""];
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} }
 
 const $ = id => document.getElementById(id);
@@ -365,20 +380,21 @@ function basisParagraphs(i, y) {
   const mush = n(S.price.mush[i]), buy = n(S.price.buy[i]), med = n(S.price.medium[i]), modP = n(S.price.modular[i]);
   const N = v => `<span class="num">${v}</span>`;
   const oldSelf = y.self - y.newSelf, oldMod = y.mod - y.newMod;
+  // 문장은 "~함 / ~임 / ~음"으로 마무리 (개조식)
   const prod = [
-    `${yr}년에는 자체생산(버섯) 시설 ${N(fmtInt(y.self) + "동")}과 모듈러 ${N(fmtInt(y.mod) + "대")}를 가동합니다. ` +
-      (first ? `첫해이므로 모두 신규 시설입니다.` : `전년보다 자체생산 ${N(fmtInt(y.newSelf) + "동")}, 모듈러 ${N(fmtInt(y.newMod) + "대")}가 늘었습니다.`),
-    `시설 1동(대)은 20일마다 1회, 1년에 ${FIX.turns}회 배지를 넣습니다. 1회 입상량은 자체생산 동당 ${fmtInt(FIX.selfPer)}개, 모듈러 대당 ${fmtInt(FIX.modPer)}개이며, 그해 새로 지은 시설은 ${half}%만 가동합니다.`,
-    `따라서 자체생산 배지 투입수는 신규 ${fmtInt(y.newSelf)}동 × ${fmtInt(FIX.selfPer)}개 × ${FIX.turns}회 × ${half}% + 기존 ${fmtInt(oldSelf)}동 × ${fmtInt(FIX.selfPer)}개 × ${FIX.turns}회 = ${N(fmtInt(y.inSelf) + "개")}, ` +
-      `모듈러 배지 투입수는 신규 ${fmtInt(y.newMod)}대 × ${fmtInt(FIX.modPer)}개 × ${FIX.turns}회 × ${half}% + 기존 ${fmtInt(oldMod)}대 × ${fmtInt(FIX.modPer)}개 × ${FIX.turns}회 = ${N(fmtInt(y.inMod) + "개")}입니다.`,
-    `배지 1개에서 버섯 ${y.yk}kg을 수확하므로 버섯 생산량은 자체생산 ${N(fmtInt(y.kgSelf) + "kg")}, 모듈러 ${N(fmtInt(y.kgMod) + "kg")}, 합계 ${N(fmtTon(y.kgSelf + y.kgMod) + "톤")}입니다.`,
+    `${yr}년 자체생산(버섯) 시설 ${N(fmtInt(y.self) + "동")}, 모듈러 ${N(fmtInt(y.mod) + "대")} 가동. ` +
+      (first ? `첫해이므로 모두 신규 시설임.` : `전년 대비 자체생산 ${N(fmtInt(y.newSelf) + "동")}, 모듈러 ${N(fmtInt(y.newMod) + "대")} 증가함.`),
+    `시설 1동(대)당 20일마다 1회, 연 ${FIX.turns}회 배지 입상. 1회 입상량은 자체생산 동당 ${fmtInt(FIX.selfPer)}개, 모듈러 대당 ${fmtInt(FIX.modPer)}개이며, 당해 신설 시설은 ${half}%만 가동함.`,
+    `자체생산 배지 투입수: 신규 ${fmtInt(y.newSelf)}동 × ${fmtInt(FIX.selfPer)}개 × ${FIX.turns}회 × ${half}% + 기존 ${fmtInt(oldSelf)}동 × ${fmtInt(FIX.selfPer)}개 × ${FIX.turns}회 = ${N(fmtInt(y.inSelf) + "개")}. ` +
+      `모듈러 배지 투입수: 신규 ${fmtInt(y.newMod)}대 × ${fmtInt(FIX.modPer)}개 × ${FIX.turns}회 × ${half}% + 기존 ${fmtInt(oldMod)}대 × ${fmtInt(FIX.modPer)}개 × ${FIX.turns}회 = ${N(fmtInt(y.inMod) + "개")}임.`,
+    `배지 1개당 버섯 ${y.yk}kg 수확 기준, 버섯 생산량은 자체생산 ${N(fmtInt(y.kgSelf) + "kg")}, 모듈러 ${N(fmtInt(y.kgMod) + "kg")}, 합계 ${N(fmtTon(y.kgSelf + y.kgMod) + "톤")}임.`,
   ];
   const rev = [
-    `자체생산(버섯) 매출은 생산량 ${fmtInt(y.kgSelf)}kg × 판매단가 ${fmtInt(mush)}원 = ${N(fmtKrw(y.rev.own))}입니다.`,
-    `위탁생산버섯(모듈러) 매출은 모듈러에서 수매한 버섯 ${fmtInt(y.kgMod)}kg을 같은 단가 ${fmtInt(mush)}원에 판매한 ${N(fmtKrw(y.rev.mod))}입니다.`,
-    `배지매출(위탁생산)은 모듈러에 공급한 배지 ${fmtInt(y.inMod)}개 × ${fmtInt(med)}원 = ${N(fmtKrw(y.rev.med))}입니다.`,
-    `모듈러 판매 매출은 그해 새로 판매한 모듈러 ${fmtInt(y.newMod)}대 × ${fmtKrw(modP)} = ${N(fmtKrw(y.rev.sale))}입니다.`,
-    `이를 모두 더한 ${yr}년 매출 합계는 ${N(fmtKrw(y.rev.total))}입니다.`,
+    `자체생산(버섯) 매출: 생산량 ${fmtInt(y.kgSelf)}kg × 판매단가 ${fmtInt(mush)}원 = ${N(fmtKrw(y.rev.own))}임.`,
+    `위탁생산버섯(모듈러) 매출: 모듈러에서 수매한 버섯 ${fmtInt(y.kgMod)}kg을 같은 단가 ${fmtInt(mush)}원에 판매하여 ${N(fmtKrw(y.rev.mod))}임.`,
+    `배지매출(위탁생산): 모듈러에 공급한 배지 ${fmtInt(y.inMod)}개 × ${fmtInt(med)}원 = ${N(fmtKrw(y.rev.med))}임.`,
+    `모듈러 판매 매출: 당해 신규 판매 모듈러 ${fmtInt(y.newMod)}대 × ${fmtKrw(modP)} = ${N(fmtKrw(y.rev.sale))}임.`,
+    `${yr}년 매출 합계는 ${N(fmtKrw(y.rev.total))}임.`,
   ];
   const cost = [
     `자체생산(버섯) 매출의 ${pctTxt(y.cr.own)} = ${N(fmtKrw(y.cogs.own))}`,
@@ -388,13 +404,15 @@ function basisParagraphs(i, y) {
   ];
   const sgaRate = n(S.sga[i]);
   const profit = [
-    `매출 ${fmtKrw(y.rev.total)}에서 매출원가 ${fmtKrw(y.cogs.total)}(평균 원가율 ${pctTxt(y.cogs.total / y.rev.total)})을 빼면 매출이익은 ${N(fmtKrw(y.gross.total))}(매출이익률 ${pctTxt(y.gross.total / y.rev.total)})입니다.`,
+    `매출 ${fmtKrw(y.rev.total)}에서 매출원가 ${fmtKrw(y.cogs.total)}(평균 원가율 ${pctTxt(y.cogs.total / y.rev.total)})을 빼면 매출이익 ${N(fmtKrw(y.gross.total))}(매출이익률 ${pctTxt(y.gross.total / y.rev.total)})임.`,
     sgaRate
-      ? `판매관리비는 매출의 ${sgaRate}%인 ${N(fmtKrw(y.sga.total))}입니다.`
-      : `판매관리비율을 0%로 두었으므로 판매관리비는 없습니다. (원가율에 모든 비용을 포함한 기준)`,
-    `따라서 영업이익은 매출이익 ${fmtKrw(y.gross.total)} − 판매관리비 ${fmtKrw(y.sga.total)} = ${N(fmtKrw(y.op.total))}, 영업이익률은 ${N(pctTxt(y.op.total / y.rev.total))}입니다.`,
+      ? `판매관리비는 매출의 ${sgaRate}%인 ${N(fmtKrw(y.sga.total))}임.`
+      : `판매관리비율 0% 적용으로 판매관리비 없음 (원가율에 모든 비용 포함 기준).`,
+    `영업이익은 매출이익 ${fmtKrw(y.gross.total)} − 판매관리비 ${fmtKrw(y.sga.total)} = ${N(fmtKrw(y.op.total))}, 영업이익률 ${N(pctTxt(y.op.total / y.rev.total))}임.`,
   ];
-  return { prod, rev, cost, profit };
+  // 연도별 정성적 내용 (입력란에 적은 글 그대로)
+  const note = String((S.notes || [])[i] || "").trim();
+  return { prod, rev, cost, profit, note };
 }
 const stripTags = h => h.replace(/<[^>]+>/g, "");
 function renderBasis(R) {
@@ -402,6 +420,7 @@ function renderBasis(R) {
     const b = basisParagraphs(i, y);
     return `<article class="basis-box">
       <h3>${years()[i]}년 (${i + 1}년차) <span>매출 ${fmtKrw(y.rev.total)} · 영업이익 ${fmtKrw(y.op.total)} (${pctTxt(y.op.total / y.rev.total)}) · 버섯 ${fmtTon(y.kgSelf + y.kgMod)}톤</span></h3>
+      ${b.note ? `<div class="basis-note"><h4>정성적 내용</h4><p>${esc(b.note)}</p></div>` : ""}
       <div class="basis-cols">
         <div class="basis-part"><h4>① 생산량</h4>${b.prod.map(t => `<p>${t}</p>`).join("")}</div>
         <div class="basis-part"><h4>② 매출</h4>${b.rev.map(t => `<p>${t}</p>`).join("")}</div>
@@ -462,6 +481,8 @@ function buildInputs() {
     `<tr class="calc"><td>${label}<span class="unit">${unit}</span></td>${[0,1,2,3].map(i => `<td class="num" id="${id}-${i}"></td>`).join("")}</tr>`;
   const group = (label, color) => `<tr class="group"><td>${color ? `<span class="dot" style="background:var(${color})"></span>` : ""}${label}</td><td colspan="4"></td></tr>`;
 
+  $("notesBox").innerHTML = years().map((yr, i) =>
+    `<label class="note-in"><span>${yr}년 (${i + 1}년차)</span><textarea id="i-notes-${i}" data-path="notes.${i}" data-text="1" maxlength="2000" placeholder="예: 1단지 착공, 판매처 확보 진행">${esc(S.notes[i] || "")}</textarea></label>`).join("");
   $("inTbl").innerHTML = yearHead("항목") + "<tbody>" +
     group("생산동수") +
     row("자체생산(버섯)", "동", "dong.self") + crow("신규증가", "동 · 전년 대비", "c-newself") +
@@ -763,7 +784,7 @@ function showApplyState(appliedAt) {
 }
 function applyEdits() {
   update();
-  document.querySelectorAll("input.changed").forEach(el => el.classList.remove("changed"));
+  document.querySelectorAll(".changed").forEach(el => el.classList.remove("changed"));
   dirty = 0;
   showApplyState(new Date());
   toast("수정한 값을 반영해 손익·그래프·재고·시설 설명을 다시 계산했습니다.");
@@ -822,7 +843,7 @@ function buildWorkbook() {
   const wb = XLSX.utils.book_new();
 
   XLSX.utils.book_append_sheet(wb, sheet([
-    ["버섯사업 4개년 손익계획", "", "", "", "", ""],
+    ["재무계획 (버섯사업 4개년)", "", "", "", "", ""],
     ["단위: 원"],
     [],
     ["구분", ...y, "4년 합계"],
@@ -906,7 +927,7 @@ function buildWorkbook() {
   const basisRows = [];
   R.Y.forEach((v, i) => {
     const b = basisParagraphs(i, v);
-    basisRows.push([`${years()[i]}년 (${i + 1}년차)`], ["① 생산량"], ...b.prod.map(t => ["", stripTags(t)]),
+    basisRows.push([`${years()[i]}년 (${i + 1}년차)`], ...(b.note ? [["정성적 내용"], ["", b.note]] : []), ["① 생산량"], ...b.prod.map(t => ["", stripTags(t)]),
       ["② 매출"], ...b.rev.map(t => ["", stripTags(t)]),
       ["③ 매출원가"], ...b.cost.map(t => ["", stripTags(t)]),
       ["④ 판관비 · 영업이익"], ...b.profit.map(t => ["", stripTags(t)]), []);
@@ -942,7 +963,7 @@ async function saveXlsx(wb, filename, btn) {
   }
 }
 $("xlsxBtn").addEventListener("click", e =>
-  { if (dirty) applyEdits(); saveXlsx(buildWorkbook(), `버섯사업_손익계획_${years()[0]}-${years()[3]}.xlsx`, e.target); });
+  { if (dirty) applyEdits(); saveXlsx(buildWorkbook(), `재무계획_${years()[0]}-${years()[3]}.xlsx`, e.target); });
 
 // ---- 연도별 입력 업로드 ----
 // 양식의 각 행: 구분 | 항목 | 단위 | 1년차 | 2년차 | 3년차 | 4년차 | 코드(수정 금지)
@@ -960,16 +981,18 @@ const YEAR_ROWS = [
   ["판매관리비율", "판관비율", "%", "sga"],
   ["배지", "최대 생산량", "개", "medium.prod"],
   ["투자", "투자 내용", "글자", "invest.label"],
+  ["정성적 내용", "연도별 내용", "글자", "notes"],
   ["투자", "부지 면적", "평", "invest.landArea"],
   ["투자", "부지 평당 단가", "원", "invest.landPrice"],
   ["투자", "건축 면적", "평", "invest.bldgArea"],
   ["투자", "건축 평당 단가", "원", "invest.bldgPrice"],
 ];
 const TEMPLATE_SHEET = "연도별입력";
+const TEXT_KEYS = ["invest.label", "notes"]; // 글자로 받는 항목
 
 function buildTemplate() {
   const rows = [["구분", "항목", "단위", ...years().map(y => `${y}년`), "코드(수정 금지)"],
-    ...YEAR_ROWS.map(([g, item, unit, key]) => [g, item, unit, ...get(key).map(v => key === "invest.label" ? String(v) : n(v)), key])];
+    ...YEAR_ROWS.map(([g, item, unit, key]) => [g, item, unit, ...get(key).map(v => TEXT_KEYS.includes(key) ? String(v) : n(v)), key])];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws["!cols"] = [12, 16, 8, 16, 16, 16, 16, 18].map(w => ({ wch: w }));
   for (const ref in ws) if (ref[0] !== "!" && typeof ws[ref].v === "number") ws[ref].z = "#,##0.##";
@@ -977,7 +1000,7 @@ function buildTemplate() {
   XLSX.utils.book_append_sheet(wb, ws, TEMPLATE_SHEET);
   return wb;
 }
-$("tplBtn").addEventListener("click", e => saveXlsx(buildTemplate(), "버섯사업_연도별입력_양식.xlsx", e.target));
+$("tplBtn").addEventListener("click", e => saveXlsx(buildTemplate(), "재무계획_연도별입력_양식.xlsx", e.target));
 
 const toNum = v => {
   if (v === undefined || v === null || v === "") return 0;
@@ -996,7 +1019,7 @@ function applyUpload(wb) {
     const def = byKey[String(row[7]).trim()] || byLabel[`${String(row[0]).trim()}|${String(row[1]).trim()}`];
     if (!def) return;
     const key = def[3];
-    const vals = [3, 4, 5, 6].map(c => key === "invest.label" ? String(row[c] ?? "") : toNum(row[c]));
+    const vals = [3, 4, 5, 6].map(c => TEXT_KEYS.includes(key) ? String(row[c] ?? "") : toNum(row[c]));
     if (vals.some(v => typeof v === "number" && (isNaN(v) || v < 0))) { bad.push(`${idx + 2}행 ${def[0]} ${def[1]}`); skipped.add(key); return; }
     vals.forEach((v, i) => set(`${key}.${i}`, v));
     done.add(key);
