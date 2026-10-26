@@ -99,6 +99,8 @@ input.changed, textarea.changed { background: var(--warn-bg); border-color: var(
 .notes-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .note-in { display: grid; gap: 4px; font-size: 13px; font-weight: 500; min-width: 0; }
 .note-in textarea { font: inherit; font-weight: 400; min-height: 120px; resize: vertical; color: var(--input-fg); background: var(--input-bg); border: 1px solid var(--input-line); border-radius: 4px; padding: 6px 8px; line-height: 1.6; width: 100%; }
+.ai-badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 700; }
+.ai-badge.off { background: var(--row-alt); color: var(--muted); }
 .q-note { background: linear-gradient(transparent 62%, color-mix(in srgb, var(--input-line) 28%, transparent) 62%); }
 .basis-note { background: var(--row-alt); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; }
 .basis-note h4 { margin: 0; font-size: 13px; color: var(--accent); }
@@ -207,7 +209,7 @@ input.changed, textarea.changed { background: var(--warn-bg); border-color: var(
   </section>
 
   <section>
-    <h2>연도별 산출 근거 <small>생산량 → 매출 → 매출원가 → 판관비 → 영업이익 순서로 설명 · 입력값을 반영하면 함께 바뀝니다</small></h2>
+    <h2>연도별 산출 근거 <small id="basisState"></small> <small>생산량 → 매출 → 매출원가 → 판관비 → 영업이익 순서로 설명 · 입력값을 반영하면 함께 바뀝니다</small></h2>
     <div class="basis-list" id="basisBoxes"></div>
   </section>
 
@@ -375,7 +377,7 @@ const fmtKrw = v => {
   return fmtInt(v) + "원";
 };
 const pctTxt = r => (isFinite(r) ? (r * 100).toLocaleString("ko-KR", { maximumFractionDigits: 1 }) + "%" : "0%");
-function basisParagraphs(i, y) {
+function basisParagraphs(i, y, withNotes = true) {
   const yr = years()[i], first = i === 0;
   const half = FIX.firstYear * 100;
   const mush = n(S.price.mush[i]), buy = n(S.price.buy[i]), med = n(S.price.medium[i]), modP = n(S.price.modular[i]);
@@ -412,6 +414,7 @@ function basisParagraphs(i, y) {
     `영업이익은 매출이익 ${fmtKrw(y.gross.total)} − 판매관리비 ${fmtKrw(y.sga.total)} = ${N(fmtKrw(y.op.total))}, 영업이익률 ${N(pctTxt(y.op.total / y.rev.total))}임.`,
   ];
   // 연도별 정성적 내용을 해당 항목 끝에 이어서 서술 (줄마다 한 가지)
+  if (!withNotes) return { prod, rev, cost, profit };
   const q = noteSentences(i);
   const tag = t => `<span class="q-note">${esc(t)}</span>`;
   q.prod.forEach(t => prod.push(tag(t)));
@@ -445,9 +448,12 @@ function noteSentences(i) {
     const m = line.match(/^\[([^\]]+)\]\s*/);
     if (m && NOTE_TAGS[m[1].trim()]) { sec = NOTE_TAGS[m[1].trim()]; line = line.slice(m[0].length); }
     if (!sec) {
+      // "매출원가(율)" · "원가율"은 원가 항목 — 그 안의 "매출" 글자가 매출로 세어지지 않게 먼저 떼어 낸다
+      let probe = line, bonus = 0;
+      probe = probe.replace(/매출\s*원가율?|원가율/g, () => { bonus += 2; return " "; });
       let best = 0;
       for (const [k, words] of Object.entries(NOTE_KEYS)) {
-        const sc = words.reduce((a, w) => a + (line.includes(w) ? 1 : 0), 0);
+        const sc = words.reduce((a, w) => a + (probe.includes(w) ? 1 : 0), 0) + (k === "cost" ? bonus : 0);
         if (sc > best) { best = sc; sec = k; }
       }
     }
@@ -458,9 +464,36 @@ function noteSentences(i) {
   return out;
 }
 const stripTags = h => h.replace(/<[^>]+>/g, "");
+// AI 서술용 자료: 계산 근거 문장(숫자 포함) + 정성적 내용 줄
+function basisFacts(R) {
+  return R.Y.map((y, i) => {
+    const b = basisParagraphs(i, y, false);
+    const notes = String((S.notes || [])[i] || "").split(/\n+/).map(t => t.trim()).filter(Boolean);
+    return { year: years()[i], prod: b.prod.map(stripTags), rev: b.rev.map(stripTags), cost: b.cost.map(stripTags), profit: b.profit.map(stripTags), notes };
+  });
+}
+function basisHash(facts) {
+  const t = JSON.stringify(facts); let h = 5381;
+  for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16) + ":" + t.length;
+}
+// 화면·엑셀에 쓸 연도별 문장: 저장된 AI 서술이 지금 입력과 같으면 AI 문장, 아니면 자동 문장
+function basisContent(R) {
+  const facts = basisFacts(R), hash = basisHash(facts);
+  const ai = window.planNarrative;
+  const useAi = !!(ai && ai.hash === hash && Array.isArray(ai.years) && ai.years.length === R.Y.length);
+  const years_ = R.Y.map((y, i) => useAi
+    ? { prod: ai.years[i].prod.map(esc), rev: ai.years[i].rev.map(esc), cost: ai.years[i].cost.map(esc), profit: ai.years[i].profit.map(esc) }
+    : basisParagraphs(i, y));
+  return { useAi, stale: !!(ai && !useAi), at: ai && ai.at, years: years_, facts, hash };
+}
 function renderBasis(R) {
+  const c = basisContent(R);
+  const st = $("basisState");
+  if (st) st.innerHTML = c.useAi ? `<span class="ai-badge">AI 작성</span> ${c.at ? String(c.at).slice(0, 16).replace("T", " ") : ""}`
+    : c.stale ? `<span class="ai-badge off">자동 문장</span> 입력이 바뀌어 AI 서술을 다시 만들어야 함` : "";
   $("basisBoxes").innerHTML = R.Y.map((y, i) => {
-    const b = basisParagraphs(i, y);
+    const b = c.years[i];
     return `<article class="basis-box">
       <h3>${years()[i]}년 (${i + 1}년차) <span>매출 ${fmtKrw(y.rev.total)} · 영업이익 ${fmtKrw(y.op.total)} (${pctTxt(y.op.total / y.rev.total)}) · 버섯 ${fmtTon(y.kgSelf + y.kgMod)}톤</span></h3>
       <div class="basis-cols">
@@ -967,8 +1000,9 @@ function buildWorkbook() {
 
   // 연도별 산출 근거 (서술식)
   const basisRows = [];
+  const bc = basisContent(R);
   R.Y.forEach((v, i) => {
-    const b = basisParagraphs(i, v);
+    const b = bc.years[i];
     basisRows.push([`${years()[i]}년 (${i + 1}년차)`], ["① 생산량"], ...b.prod.map(t => ["", stripTags(t)]),
       ["② 매출"], ...b.rev.map(t => ["", stripTags(t)]),
       ["③ 매출원가"], ...b.cost.map(t => ["", stripTags(t)]),
