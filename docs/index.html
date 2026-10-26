@@ -44,6 +44,7 @@
   --input-bg: #3b3418; --input-line: #9c8433; --input-fg: #fbefc0; --row-alt: #222a25; --warn: #f08b77; --warn-bg: #3a2420; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.55; margin: 0; }
 .wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 28px; }
 header { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; justify-content: space-between; }
@@ -119,6 +120,18 @@ input.changed { background: var(--warn-bg); border-color: var(--warn); color: va
 .example { font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 4px; padding: 6px 10px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .fac-plan { display: grid; gap: 8px; }
+/* 연도별 산출 근거 (서술식) */
+.basis-list { display: grid; gap: 12px; }
+.basis-box { background: var(--surface); border: 1px solid var(--fg); border-radius: 6px; padding: 14px 18px; display: grid; gap: 10px; min-width: 0; }
+.basis-box > h3 { margin: 0; font-size: 16px; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.basis-box > h3 span { font-size: 12px; font-weight: 400; color: var(--muted); }
+.basis-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; }
+.basis-part { display: grid; gap: 4px; min-width: 0; }
+.basis-part h4 { margin: 0; font-size: 13px; color: var(--accent); }
+.basis-part p { margin: 0; line-height: 1.7; max-width: 70ch; }
+.basis-part p .num { font-family: var(--font-num); font-weight: 500; }
+.basis-part ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; line-height: 1.65; }
+@media (max-width: 760px) { .basis-cols { grid-template-columns: 1fr; } }
 .fac-head { justify-content: space-between; }
 .fac-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 /* 연도별 박스 한 줄: 연도·재고 | 자체생산 | 위탁생산 */
@@ -180,6 +193,11 @@ input.changed { background: var(--warn-bg); border-color: var(--warn); color: va
       <button type="button" data-mode="share" aria-pressed="false">매출 구성비 (%)</button>
     </div>
     <div class="panel chart-wrap"><div class="chart-box"><canvas id="chart" aria-label="연도별 부문별 매출과 영업이익 그래프"></canvas></div><div class="chart-table" id="chartTable"></div></div>
+  </section>
+
+  <section>
+    <h2>연도별 산출 근거 <small>생산량 → 매출 → 매출원가 → 판관비 → 영업이익 순서로 설명 · 입력값을 반영하면 함께 바뀝니다</small></h2>
+    <div class="basis-list" id="basisBoxes"></div>
   </section>
 
   <section>
@@ -330,6 +348,65 @@ function planText(yr, y) {
   return `${yr}년: 기말재고 ${fmtInt(p.stock)}개 소진을 위해 자체생산(버섯) 시설(동당 1회 ${fmtInt(FIX.selfPer)}개 기준) ${fmtInt(p.selfUnits)}동 증축` +
     ` (현재 ${fmtInt(y.self)}동 → ${fmtInt(y.self + p.selfUnits)}동), 위탁생산버섯(모듈러, 대당 1회 ${fmtInt(FIX.modPer)}개 기준) ${fmtInt(p.modUnits)}대 필요` +
     ` (현재 ${fmtInt(y.mod)}대 → ${fmtInt(y.mod + p.modUnits)}대)`;
+}
+// ---- 연도별 산출 근거 (서술식) ----
+// 금액: 1억 이상은 "15.6억원", 미만은 "6,300만원"
+const fmtKrw = v => {
+  if (Math.abs(v) >= EOK) return (v / EOK).toLocaleString("ko-KR", { maximumFractionDigits: 1 }) + "억원";
+  if (Math.abs(v) >= 10000) return Math.round(v / 10000).toLocaleString("ko-KR") + "만원";
+  return fmtInt(v) + "원";
+};
+const pctTxt = r => (isFinite(r) ? (r * 100).toLocaleString("ko-KR", { maximumFractionDigits: 1 }) + "%" : "0%");
+function basisParagraphs(i, y) {
+  const yr = years()[i], first = i === 0;
+  const half = FIX.firstYear * 100;
+  const mush = n(S.price.mush[i]), buy = n(S.price.buy[i]), med = n(S.price.medium[i]), modP = n(S.price.modular[i]);
+  const N = v => `<span class="num">${v}</span>`;
+  const oldSelf = y.self - y.newSelf, oldMod = y.mod - y.newMod;
+  const prod = [
+    `${yr}년에는 자체생산(버섯) 시설 ${N(fmtInt(y.self) + "동")}과 모듈러 ${N(fmtInt(y.mod) + "대")}를 가동합니다. ` +
+      (first ? `첫해이므로 모두 신규 시설입니다.` : `전년보다 자체생산 ${N(fmtInt(y.newSelf) + "동")}, 모듈러 ${N(fmtInt(y.newMod) + "대")}가 늘었습니다.`),
+    `시설 1동(대)은 20일마다 1회, 1년에 ${FIX.turns}회 배지를 넣습니다. 1회 입상량은 자체생산 동당 ${fmtInt(FIX.selfPer)}개, 모듈러 대당 ${fmtInt(FIX.modPer)}개이며, 그해 새로 지은 시설은 ${half}%만 가동합니다.`,
+    `따라서 자체생산 배지 투입수는 신규 ${fmtInt(y.newSelf)}동 × ${fmtInt(FIX.selfPer)}개 × ${FIX.turns}회 × ${half}% + 기존 ${fmtInt(oldSelf)}동 × ${fmtInt(FIX.selfPer)}개 × ${FIX.turns}회 = ${N(fmtInt(y.inSelf) + "개")}, ` +
+      `모듈러 배지 투입수는 신규 ${fmtInt(y.newMod)}대 × ${fmtInt(FIX.modPer)}개 × ${FIX.turns}회 × ${half}% + 기존 ${fmtInt(oldMod)}대 × ${fmtInt(FIX.modPer)}개 × ${FIX.turns}회 = ${N(fmtInt(y.inMod) + "개")}입니다.`,
+    `배지 1개에서 버섯 ${y.yk}kg을 수확하므로 버섯 생산량은 자체생산 ${N(fmtInt(y.kgSelf) + "kg")}, 모듈러 ${N(fmtInt(y.kgMod) + "kg")}, 합계 ${N(fmtTon(y.kgSelf + y.kgMod) + "톤")}입니다.`,
+  ];
+  const rev = [
+    `자체생산(버섯) 매출은 생산량 ${fmtInt(y.kgSelf)}kg × 판매단가 ${fmtInt(mush)}원 = ${N(fmtKrw(y.rev.own))}입니다.`,
+    `위탁생산버섯(모듈러) 매출은 모듈러에서 수매한 버섯 ${fmtInt(y.kgMod)}kg을 같은 단가 ${fmtInt(mush)}원에 판매한 ${N(fmtKrw(y.rev.mod))}입니다.`,
+    `배지매출(위탁생산)은 모듈러에 공급한 배지 ${fmtInt(y.inMod)}개 × ${fmtInt(med)}원 = ${N(fmtKrw(y.rev.med))}입니다.`,
+    `모듈러 판매 매출은 그해 새로 판매한 모듈러 ${fmtInt(y.newMod)}대 × ${fmtKrw(modP)} = ${N(fmtKrw(y.rev.sale))}입니다.`,
+    `이를 모두 더한 ${yr}년 매출 합계는 ${N(fmtKrw(y.rev.total))}입니다.`,
+  ];
+  const cost = [
+    `자체생산(버섯) 매출의 ${pctTxt(y.cr.own)} = ${N(fmtKrw(y.cogs.own))}`,
+    `위탁생산버섯(모듈러): 수매단가 ${fmtInt(buy)}원 ÷ 판매단가 ${fmtInt(mush)}원 = ${pctTxt(y.cr.mod)} → ${N(fmtKrw(y.cogs.mod))}`,
+    `배지매출(위탁생산) 매출의 ${pctTxt(y.cr.med)} = ${N(fmtKrw(y.cogs.med))}`,
+    `모듈러 판매 매출의 ${pctTxt(y.cr.sale)} = ${N(fmtKrw(y.cogs.sale))}`,
+  ];
+  const sgaRate = n(S.sga[i]);
+  const profit = [
+    `매출 ${fmtKrw(y.rev.total)}에서 매출원가 ${fmtKrw(y.cogs.total)}(평균 원가율 ${pctTxt(y.cogs.total / y.rev.total)})을 빼면 매출이익은 ${N(fmtKrw(y.gross.total))}(매출이익률 ${pctTxt(y.gross.total / y.rev.total)})입니다.`,
+    sgaRate
+      ? `판매관리비는 매출의 ${sgaRate}%인 ${N(fmtKrw(y.sga.total))}입니다.`
+      : `판매관리비율을 0%로 두었으므로 판매관리비는 없습니다. (원가율에 모든 비용을 포함한 기준)`,
+    `따라서 영업이익은 매출이익 ${fmtKrw(y.gross.total)} − 판매관리비 ${fmtKrw(y.sga.total)} = ${N(fmtKrw(y.op.total))}, 영업이익률은 ${N(pctTxt(y.op.total / y.rev.total))}입니다.`,
+  ];
+  return { prod, rev, cost, profit };
+}
+const stripTags = h => h.replace(/<[^>]+>/g, "");
+function renderBasis(R) {
+  $("basisBoxes").innerHTML = R.Y.map((y, i) => {
+    const b = basisParagraphs(i, y);
+    return `<article class="basis-box">
+      <h3>${years()[i]}년 (${i + 1}년차) <span>매출 ${fmtKrw(y.rev.total)} · 영업이익 ${fmtKrw(y.op.total)} (${pctTxt(y.op.total / y.rev.total)}) · 버섯 ${fmtTon(y.kgSelf + y.kgMod)}톤</span></h3>
+      <div class="basis-cols">
+        <div class="basis-part"><h4>① 생산량</h4>${b.prod.map(t => `<p>${t}</p>`).join("")}</div>
+        <div class="basis-part"><h4>② 매출</h4>${b.rev.map(t => `<p>${t}</p>`).join("")}</div>
+        <div class="basis-part"><h4>③ 매출원가 (합계 ${fmtKrw(y.cogs.total)})</h4><ul>${b.cost.map(t => `<li>${t}</li>`).join("")}</ul></div>
+        <div class="basis-part"><h4>④ 판관비 · 영업이익</h4>${b.profit.map(t => `<p>${t}</p>`).join("")}</div>
+      </div></article>`;
+  }).join("");
 }
 function renderFacilityPlan(R) {
   const share = Math.min(100, Math.max(0, n(S.medium.selfShare)));
@@ -545,6 +622,7 @@ function update() {
 
   renderDetail(R);
   renderFacilityPlan(R);
+  renderBasis(R);
   drawChart(R);
   save();
 }
@@ -813,6 +891,17 @@ function buildWorkbook() {
     ["연간 투자비", "원", ...R.invY, R.investTotal],
     ["누적 투자비", "원", ...R.invCum, ""],
   ], [16, 6, 18, 18, 18, 18, 18]), "투자비");
+
+  // 연도별 산출 근거 (서술식)
+  const basisRows = [];
+  R.Y.forEach((v, i) => {
+    const b = basisParagraphs(i, v);
+    basisRows.push([`${years()[i]}년 (${i + 1}년차)`], ["① 생산량"], ...b.prod.map(t => ["", stripTags(t)]),
+      ["② 매출"], ...b.rev.map(t => ["", stripTags(t)]),
+      ["③ 매출원가"], ...b.cost.map(t => ["", stripTags(t)]),
+      ["④ 판관비 · 영업이익"], ...b.profit.map(t => ["", stripTags(t)]), []);
+  });
+  XLSX.utils.book_append_sheet(wb, sheet(basisRows, [18, 140]), "산출근거");
 
   return wb;
 }
