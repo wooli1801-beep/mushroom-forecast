@@ -99,6 +99,7 @@ input.changed, textarea.changed { background: var(--warn-bg); border-color: var(
 .notes-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .note-in { display: grid; gap: 4px; font-size: 13px; font-weight: 500; min-width: 0; }
 .note-in textarea { font: inherit; font-weight: 400; min-height: 120px; resize: vertical; color: var(--input-fg); background: var(--input-bg); border: 1px solid var(--input-line); border-radius: 4px; padding: 6px 8px; line-height: 1.6; width: 100%; }
+.q-note { background: linear-gradient(transparent 62%, color-mix(in srgb, var(--input-line) 28%, transparent) 62%); }
 .basis-note { background: var(--row-alt); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; }
 .basis-note h4 { margin: 0; font-size: 13px; color: var(--accent); }
 .basis-note p { margin: 0; white-space: pre-wrap; line-height: 1.7; overflow-wrap: anywhere; }
@@ -217,7 +218,7 @@ input.changed, textarea.changed { background: var(--warn-bg); border-color: var(
   </section>
 
   <section>
-    <h2>연도별 정성적 내용 <small>시장 상황·사업 이슈·가정 등을 자유롭게 적으면 연도별 산출 근거에 함께 표시</small></h2>
+    <h2>연도별 정성적 내용 <small>줄마다 한 가지씩 적으면 낱말에 따라 산출 근거의 생산량·매출·매출원가·판관비·영업이익 항목에 이어서 서술됨 · 줄 앞에 [생산] [매출] [원가] [이익]을 붙이면 그 항목으로</small></h2>
     <div class="panel notes-grid" id="notesBox"></div>
   </section>
 
@@ -410,9 +411,51 @@ function basisParagraphs(i, y) {
       : `판매관리비율 0% 적용으로 판매관리비 없음 (원가율에 모든 비용 포함 기준).`,
     `영업이익은 매출이익 ${fmtKrw(y.gross.total)} − 판매관리비 ${fmtKrw(y.sga.total)} = ${N(fmtKrw(y.op.total))}, 영업이익률 ${N(pctTxt(y.op.total / y.rev.total))}임.`,
   ];
-  // 연도별 정성적 내용 (입력란에 적은 글 그대로)
-  const note = String((S.notes || [])[i] || "").trim();
-  return { prod, rev, cost, profit, note };
+  // 연도별 정성적 내용을 해당 항목 끝에 이어서 서술 (줄마다 한 가지)
+  const q = noteSentences(i);
+  const tag = t => `<span class="q-note">${esc(t)}</span>`;
+  q.prod.forEach(t => prod.push(tag(t)));
+  q.rev.forEach(t => rev.push(tag(t)));
+  q.cost.forEach(t => cost.push(tag(t)));
+  [...q.profit, ...q.etc].forEach(t => profit.push(tag(t)));
+  return { prod, rev, cost, profit };
+}
+// 정성적 내용 → 항목 분류 + 개조식 문장
+// 줄 앞에 [생산] [매출] [원가] [이익]을 붙이면 그 항목으로, 없으면 낱말로 자동 분류
+const NOTE_KEYS = {
+  prod: ["생산", "시설", "착공", "건축", "준공", "공사", "입상", "투입", "수확", "재배", "설비", "증설", "공장", "가동", "인허가", "허가", "부지", "설계", "동수", "배지 공급"],
+  rev: ["매출", "판매", "단가", "가격", "수요", "판로", "거래처", "계약", "수출", "납품", "분양", "시장", "고객", "유통", "판매처"],
+  cost: ["원가", "원재료", "재료비", "인건비", "수매", "비용", "전기", "물류", "운송", "원료"],
+  profit: ["판관비", "판매관리비", "관리비", "마케팅", "홍보", "영업이익", "이익", "보조금", "지원금", "세금", "금리", "이자", "투자", "자금", "대출"],
+};
+const NOTE_TAGS = { "생산": "prod", "매출": "rev", "판매": "rev", "원가": "cost", "비용": "cost", "이익": "profit", "판관비": "profit" };
+function toGaejo(t) {
+  t = t.trim().replace(/[.。!！\s]+$/, "");
+  const rules = [[/있습니다$/, "있음"], [/없습니다$/, "없음"], [/했습니다$/, "했음"], [/였습니다$/, "였음"], [/됩니다$/, "됨"], [/합니다$/, "함"], [/입니다$/, "임"], [/습니다$/, "음"],
+    [/있다$/, "있음"], [/없다$/, "없음"], [/했다$/, "했음"], [/였다$/, "였음"], [/된다$/, "됨"], [/한다$/, "함"], [/이다$/, "임"], [/예정이다$/, "예정임"]];
+  for (const [re, to] of rules) if (re.test(t)) return t.replace(re, to) + ".";
+  return t + ".";
+}
+function noteSentences(i) {
+  const out = { prod: [], rev: [], cost: [], profit: [], etc: [] };
+  const raw = String((S.notes || [])[i] || "");
+  const lines = raw.split(/\n+/).flatMap(l => l.split(/(?<=[.。])\s+/)).map(l => l.trim()).filter(Boolean);
+  for (let line of lines) {
+    let sec = null;
+    const m = line.match(/^\[([^\]]+)\]\s*/);
+    if (m && NOTE_TAGS[m[1].trim()]) { sec = NOTE_TAGS[m[1].trim()]; line = line.slice(m[0].length); }
+    if (!sec) {
+      let best = 0;
+      for (const [k, words] of Object.entries(NOTE_KEYS)) {
+        const sc = words.reduce((a, w) => a + (line.includes(w) ? 1 : 0), 0);
+        if (sc > best) { best = sc; sec = k; }
+      }
+    }
+    sec = sec || "etc";
+    const lead = sec === "etc" ? "그 밖에" : out[sec].length ? "또한" : "아울러";
+    out[sec].push(`${lead} ${toGaejo(line)}`);
+  }
+  return out;
 }
 const stripTags = h => h.replace(/<[^>]+>/g, "");
 function renderBasis(R) {
@@ -420,7 +463,6 @@ function renderBasis(R) {
     const b = basisParagraphs(i, y);
     return `<article class="basis-box">
       <h3>${years()[i]}년 (${i + 1}년차) <span>매출 ${fmtKrw(y.rev.total)} · 영업이익 ${fmtKrw(y.op.total)} (${pctTxt(y.op.total / y.rev.total)}) · 버섯 ${fmtTon(y.kgSelf + y.kgMod)}톤</span></h3>
-      ${b.note ? `<div class="basis-note"><h4>정성적 내용</h4><p>${esc(b.note)}</p></div>` : ""}
       <div class="basis-cols">
         <div class="basis-part"><h4>① 생산량</h4>${b.prod.map(t => `<p>${t}</p>`).join("")}</div>
         <div class="basis-part"><h4>② 매출</h4>${b.rev.map(t => `<p>${t}</p>`).join("")}</div>
@@ -482,7 +524,7 @@ function buildInputs() {
   const group = (label, color) => `<tr class="group"><td>${color ? `<span class="dot" style="background:var(${color})"></span>` : ""}${label}</td><td colspan="4"></td></tr>`;
 
   $("notesBox").innerHTML = years().map((yr, i) =>
-    `<label class="note-in"><span>${yr}년 (${i + 1}년차)</span><textarea id="i-notes-${i}" data-path="notes.${i}" data-text="1" maxlength="2000" placeholder="예: 1단지 착공, 판매처 확보 진행">${esc(S.notes[i] || "")}</textarea></label>`).join("");
+    `<label class="note-in"><span>${yr}년 (${i + 1}년차)</span><textarea id="i-notes-${i}" data-path="notes.${i}" data-text="1" maxlength="2000" placeholder="줄마다 한 가지씩 적으세요.&#10;예: 1단지 착공 예정&#10;대형마트 판매처 확보로 단가 유지&#10;[이익] 지자체 보조금 신청">${esc(S.notes[i] || "")}</textarea></label>`).join("");
   $("inTbl").innerHTML = yearHead("항목") + "<tbody>" +
     group("생산동수") +
     row("자체생산(버섯)", "동", "dong.self") + crow("신규증가", "동 · 전년 대비", "c-newself") +
@@ -927,7 +969,7 @@ function buildWorkbook() {
   const basisRows = [];
   R.Y.forEach((v, i) => {
     const b = basisParagraphs(i, v);
-    basisRows.push([`${years()[i]}년 (${i + 1}년차)`], ...(b.note ? [["정성적 내용"], ["", b.note]] : []), ["① 생산량"], ...b.prod.map(t => ["", stripTags(t)]),
+    basisRows.push([`${years()[i]}년 (${i + 1}년차)`], ["① 생산량"], ...b.prod.map(t => ["", stripTags(t)]),
       ["② 매출"], ...b.rev.map(t => ["", stripTags(t)]),
       ["③ 매출원가"], ...b.cost.map(t => ["", stripTags(t)]),
       ["④ 판관비 · 영업이익"], ...b.profit.map(t => ["", stripTags(t)]), []);
